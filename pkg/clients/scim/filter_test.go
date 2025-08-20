@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.tools.sap/kms/cmk/internal/clients/scim"
+	"github.com/openkcm/identity-management-plugins/pkg/clients/scim"
 )
 
 func TestFilterComparison(t *testing.T) {

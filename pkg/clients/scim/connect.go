@@ -9,8 +9,9 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.tools.sap/kms/cmk/internal/errs"
-	"github.tools.sap/kms/cmk/utils/httpclient"
+	errs "github.com/openkcm/identity-management-plugins/pkg/utils/errs"
+	"github.com/openkcm/identity-management-plugins/pkg/utils/httpclient"
+	"github.com/openkcm/identity-management-plugins/pkg/utils/tlsconfig"
 )
 
 const (
@@ -32,42 +33,88 @@ var (
 	ErrAuthParams      = errors.New("must provide client secret or TLS config")
 )
 
-// APIParams contains the parameters needed to create a new API client
-// supporting client authentication via client secret or mTLS.
+type Common struct {
+	Host         string `json:"host"`
+	ClientID     string `json:"clientid"`
+	ClientSecret string `json:"clientsecret"`
+}
+
+type TLSParams struct {
+	Cert string `json:"cert"`
+	Key  string `json:"key"`
+}
+
 type APIParams struct {
-	Host         string
-	ClientID     string
-	ClientSecret string
-	TLSConfig    *tls.Config
+	Common
+
+	TLS *TLSParams `json:"tlsconfig"`
 }
 
-type APIClient struct {
+type Params struct {
+	Common
+
+	TLS *tls.Config
+}
+
+type Client struct {
 	httpClient http.Client
-	Params     APIParams
+	Params     Common
 }
 
-func NewClient(params APIParams) (*APIClient, error) {
+func NewClient(ctx context.Context, params Params) (*Client, error) {
 	if params.ClientID == "" {
 		return nil, ErrClientIDMissing
 	}
 
-	if params.TLSConfig == nil && params.ClientSecret == "" {
-		// If TLSConfig is not provided, client secret must be provided
+	if params.TLS != nil {
+		return &Client{
+			httpClient: http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: params.TLS,
+				},
+			},
+			Params: params.Common,
+		}, nil
+	} else if params.ClientSecret != "" {
+		return &Client{
+			Params: params.Common,
+		}, nil
+	} else {
 		return nil, ErrAuthParams
 	}
+}
 
-	return &APIClient{
-		httpClient: http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: params.TLSConfig,
+func NewClientFromAPI(ctx context.Context, params APIParams) (*Client, error) {
+	if params.ClientID == "" {
+		return nil, ErrClientIDMissing
+	}
+
+	if params.TLS != nil && params.TLS.Key != "" && params.TLS.Cert != "" {
+		tlsConfig, err := tlsconfig.NewTLSConfig(
+			tlsconfig.WithCertAndKey(params.TLS.Cert, params.TLS.Key))
+		if err != nil {
+			return nil, err
+		}
+
+		return &Client{
+			httpClient: http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: tlsConfig,
+				},
 			},
-		},
-		Params: params,
-	}, nil
+			Params: params.Common,
+		}, nil
+	} else if params.ClientSecret != "" {
+		return &Client{
+			Params: params.Common,
+		}, nil
+	} else {
+		return nil, ErrAuthParams
+	}
 }
 
 // GetUser retrieves a SCIM user by its ID.
-func (c *APIClient) GetUser(ctx context.Context, id string) (*User, error) {
+func (c *Client) GetUser(ctx context.Context, id string) (*User, error) {
 	resourcePath := BasePathUsers + "/" + id
 	resp, err := c.makeAPIRequest(ctx, http.MethodGet, resourcePath, nil, nil)
 
@@ -95,10 +142,10 @@ func (c *APIClient) GetUser(ctx context.Context, id string) (*User, error) {
 // ListUsers retrieves a list of SCIM users.
 // It supports filtering, pagination (using cursor), and count parameters.
 // The useHTTPPost parameter determines whether to use POST method + /.search path for the request.
-func (c *APIClient) ListUsers(
+func (c *Client) ListUsers(
 	ctx context.Context,
 	useHTTPPost bool,
-	filter *FilterExpression,
+	filter FilterExpression,
 	cursor *string,
 	count *int,
 ) (*UserList, error) {
@@ -125,7 +172,7 @@ func (c *APIClient) ListUsers(
 }
 
 // GetGroup retrieves a SCIM group by its ID.
-func (c *APIClient) GetGroup(ctx context.Context, id string) (*Group, error) {
+func (c *Client) GetGroup(ctx context.Context, id string) (*Group, error) {
 	resourcePath := BasePathGroups + "/" + id
 	resp, err := c.makeAPIRequest(ctx, http.MethodGet, resourcePath, nil, nil)
 
@@ -153,10 +200,10 @@ func (c *APIClient) GetGroup(ctx context.Context, id string) (*Group, error) {
 // ListGroups retrieves a list of SCIM groups.
 // It supports filtering, pagination (using cursor), and count parameters.
 // The useHTTPPost parameter determines whether to use POST method + /.search path for the request.
-func (c *APIClient) ListGroups(
+func (c *Client) ListGroups(
 	ctx context.Context,
 	useHTTPPost bool,
-	filter *FilterExpression,
+	filter FilterExpression,
 	cursor *string,
 	count *int,
 ) (*GroupList, error) {
@@ -183,7 +230,7 @@ func (c *APIClient) ListGroups(
 	return groups, nil
 }
 
-func (c *APIClient) setAuth(req *http.Request) {
+func (c *Client) setAuth(req *http.Request) {
 	if c.Params.ClientSecret != "" {
 		req.SetBasicAuth(c.Params.ClientID, c.Params.ClientSecret)
 	} else {
@@ -194,7 +241,7 @@ func (c *APIClient) setAuth(req *http.Request) {
 	}
 }
 
-func (c *APIClient) makeAPIRequest(
+func (c *Client) makeAPIRequest(
 	ctx context.Context,
 	method string,
 	resourcePath string,
@@ -232,11 +279,11 @@ func (c *APIClient) makeAPIRequest(
 // It builds the request with the provided filter, cursor, and count parameters.
 // For GET method, parameters are added to the query string.
 // For POST method, parameters are included in the request body.
-func (c *APIClient) makeListRequest(
+func (c *Client) makeListRequest(
 	ctx context.Context,
 	useHTTPPost bool,
 	basePath string,
-	filter *FilterExpression,
+	filter FilterExpression,
 	cursor *string,
 	count *int,
 ) (*http.Response, error) {

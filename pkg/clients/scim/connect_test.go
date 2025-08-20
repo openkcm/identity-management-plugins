@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.tools.sap/kms/cmk/internal/clients/scim"
+	"github.com/openkcm/identity-management-plugins/pkg/clients/scim"
 )
 
 const (
@@ -94,9 +94,76 @@ var (
 )
 
 func TestNewClient(t *testing.T) {
-	tlsConfig := tls.Config{
-		MinVersion: tls.VersionTLS12,
+	tests := []struct {
+		name          string
+		params        scim.Params
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name: "Missing Client ID",
+			params: scim.Params{
+				Common: scim.Common{
+					Host: "https://example.com",
+				},
+				TLS: &tls.Config{},
+			},
+			expectError:   true,
+			errorContains: "client ID is required",
+		},
+		{
+			name: "Valid Client Secret",
+			params: scim.Params{
+				Common: scim.Common{
+					Host:         "https://example.com",
+					ClientID:     "test-client",
+					ClientSecret: "unreal",
+				},
+				TLS: &tls.Config{},
+			},
+			expectError: false,
+		},
+		{
+			name: "Valid TLSConfig",
+			params: scim.Params{
+				Common: scim.Common{
+					Host:     "https://example.com",
+					ClientID: "test-client",
+				},
+				TLS: &tls.Config{},
+			},
+			expectError: false,
+		},
+		{
+			name: "Missing Client Secret and TLS Config",
+			params: scim.Params{
+				Common: scim.Common{
+					Host:     "https://example.com",
+					ClientID: "test-client",
+				},
+			},
+			expectError:   true,
+			errorContains: "must provide client secret or TLS config",
+		},
 	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := scim.NewClient(t.Context(), tt.params)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorContains)
+				assert.Nil(t, client)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, client)
+			}
+		})
+	}
+}
+
+func TestNewClientFromAPI(t *testing.T) {
 	tests := []struct {
 		name          string
 		params        scim.APIParams
@@ -106,7 +173,10 @@ func TestNewClient(t *testing.T) {
 		{
 			name: "Missing Client ID",
 			params: scim.APIParams{
-				Host: "https://example.com",
+				Common: scim.Common{
+					Host: "https://example.com",
+				},
+				TLS: &scim.TLSParams{},
 			},
 			expectError:   true,
 			errorContains: "client ID is required",
@@ -114,26 +184,32 @@ func TestNewClient(t *testing.T) {
 		{
 			name: "Valid Client Secret",
 			params: scim.APIParams{
-				Host:         "https://example.com",
-				ClientID:     "test-client",
-				ClientSecret: "unreal",
+				Common: scim.Common{
+					Host:         "https://example.com",
+					ClientID:     "test-client",
+					ClientSecret: "unreal",
+				},
 			},
 			expectError: false,
 		},
 		{
-			name: "Valid TLSConfig",
+			name: "Non existent TLSConfig files",
 			params: scim.APIParams{
-				Host:      "https://example.com",
-				ClientID:  "test-client",
-				TLSConfig: &tlsConfig,
+				Common: scim.Common{
+					Host:     "https://example.com",
+					ClientID: "test-client",
+				},
+				TLS: &scim.TLSParams{"test_cert.cer", "test_key.key"},
 			},
-			expectError: false,
+			expectError: true,
 		},
 		{
 			name: "Missing Client Secret and TLS Config",
 			params: scim.APIParams{
-				Host:     "https://example.com",
-				ClientID: "test-client",
+				Common: scim.Common{
+					Host:     "https://example.com",
+					ClientID: "test-client",
+				},
 			},
 			expectError:   true,
 			errorContains: "must provide client secret or TLS config",
@@ -141,16 +217,18 @@ func TestNewClient(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		client, err := scim.NewClient(tt.params)
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := scim.NewClientFromAPI(t.Context(), tt.params)
 
-		if tt.expectError {
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), tt.errorContains)
-			assert.Nil(t, client)
-		} else {
-			assert.NoError(t, err)
-			assert.NotNil(t, client)
-		}
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorContains)
+				assert.Nil(t, client)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, client)
+			}
+		})
 	}
 }
 
@@ -201,10 +279,13 @@ func TestAPIClient_GetUser(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client, _ := scim.NewClient(scim.APIParams{
-				Host:         server.URL,
-				ClientID:     "test-client",
-				ClientSecret: "unreal",
+			client, _ := scim.NewClient(t.Context(), scim.Params{
+				Common: scim.Common{
+					Host:         server.URL,
+					ClientID:     "test-client",
+					ClientSecret: "unreal",
+				},
+				TLS: &tls.Config{},
 			})
 
 			user, err := client.GetUser(t.Context(), tt.userID)
@@ -265,13 +346,19 @@ func TestAPIClient_ListUsers(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client, _ := scim.NewClient(scim.APIParams{
-				Host:         server.URL,
-				ClientID:     "test-client",
-				ClientSecret: "unreal",
+			client, _ := scim.NewClient(t.Context(), scim.Params{
+				Common: scim.Common{
+					Host:         server.URL,
+					ClientID:     "test-client",
+					ClientSecret: "unreal",
+				},
+				TLS: &tls.Config{},
 			})
 
-			users, err := client.ListUsers(t.Context(), tt.useHTTPPost, nil, nil, nil)
+			filter := scim.FilterComparison{Attribute: "DisplayName",
+				Operator: scim.FilterOperatorEqual,
+				Value:    "None"}
+			users, err := client.ListUsers(t.Context(), tt.useHTTPPost, filter, nil, nil)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -332,10 +419,13 @@ func TestAPIClient_GetGroup(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client, _ := scim.NewClient(scim.APIParams{
-				Host:         server.URL,
-				ClientID:     "test-client",
-				ClientSecret: "unreal",
+			client, _ := scim.NewClient(t.Context(), scim.Params{
+				Common: scim.Common{
+					Host:         server.URL,
+					ClientID:     "test-client",
+					ClientSecret: "unreal",
+				},
+				TLS: &tls.Config{},
 			})
 
 			group, err := client.GetGroup(t.Context(), tt.groupID)
@@ -396,13 +486,19 @@ func TestAPIClient_ListGroups(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client, _ := scim.NewClient(scim.APIParams{
-				Host:         server.URL,
-				ClientID:     "test-client",
-				ClientSecret: "unreal",
+			client, _ := scim.NewClient(t.Context(), scim.Params{
+				Common: scim.Common{
+					Host:         server.URL,
+					ClientID:     "test-client",
+					ClientSecret: "unreal",
+				},
+				TLS: &tls.Config{},
 			})
 
-			groups, err := client.ListGroups(t.Context(), tt.useHTTPPost, nil, nil, nil)
+			filter := scim.FilterComparison{Attribute: "DisplayName",
+				Operator: scim.FilterOperatorEqual,
+				Value:    "KeyAdmin"}
+			groups, err := client.ListGroups(t.Context(), tt.useHTTPPost, filter, nil, nil)
 
 			if tt.expectError {
 				assert.Error(t, err)

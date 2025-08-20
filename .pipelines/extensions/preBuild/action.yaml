@@ -1,0 +1,23 @@
+---
+name: preBuild
+description: Piper preBuild extension
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: stable
+    - name: Generate Build Version
+      uses: hashicorp/actions-generate-metadata@main
+      id: execute
+      with:
+        repositoryOwner: ${{ github.repository_owner }}
+        repository: ${{ github.repository }}
+        version: cat VERSION
+        product: kms20
+        metadataFileName: build_version.json
+    - name: Print Build Version
+      shell: bash
+      run: cat build_version.json

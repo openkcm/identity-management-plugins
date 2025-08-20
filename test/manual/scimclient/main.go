@@ -10,24 +10,24 @@ import (
 	"log/slog"
 	"os"
 
-	"github.tools.sap/kms/cmk/internal/clients/scim"
-	"github.tools.sap/kms/cmk/utils/tlsconfig"
+	"github.com/openkcm/identity-management-plugins/pkg/clients/scim"
+	"github.com/openkcm/identity-management-plugins/pkg/utils/tlsconfig"
 )
 
 const usage = `Script to test SCIM API calls.
 Usage: scimclient [options]
 Options:
-	--action	      Action to perform (GetUser, ListUsers, GetGroup, ListGroups) (Required)
-	--host		      The SCIM server host (Required)
-	--clientID	      Client ID for authentication (Required)
-	--clientSecret    Client secret value (if using secret auth)
-	--certPath        Path to the client certificate file (if using cert-based auth)
-	--keyPath         Path to the client private key file (if using cert-based auth)
-	--useHTTPPost	  Use HTTP POST to /.search endpoint instead of GET for listing users/groups
-	--id			  ID of the user or group to retrieve
-	--cursor		  Cursor for pagination
-	--count		  	  Limit for pagination
-	--displayName	  Search for groups/users by DisplayName attribute 
+	--action	Action to perform (GetUser, ListUsers, GetGroup, ListGroups) (Required)
+	--host		The SCIM server host (Required)
+	--clientID	Client ID for authentication (Required)
+	--clientSecret  Client secret value (if using secret auth)
+	--certPath      Path to the client certificate file (if using cert-based auth)
+	--keyPath       Path to the client private key file (if using cert-based auth)
+	--useHTTPPost	Use HTTP POST to /.search endpoint instead of GET for listing users/groups
+	--id		ID of the user or group to retrieve
+	--cursor	Cursor for pagination
+	--count	Limit for pagination
+	--displayName	Search for groups/users by DisplayName attribute
 `
 
 const defaultCount = 100
@@ -67,6 +67,8 @@ func main() {
 		err       error
 	)
 
+	ctx := context.Background()
+
 	if certPath != "" && keyPath != "" {
 		tlsConfig, err = tlsconfig.NewTLSConfig(tlsconfig.WithCertAndKey(certPath, keyPath))
 		if err != nil {
@@ -75,20 +77,20 @@ func main() {
 		}
 	}
 
-	client, err := scim.NewClient(
-		scim.APIParams{
-			Host:         host,
-			ClientID:     clientID,
-			ClientSecret: clientSecret,
-			TLSConfig:    tlsConfig,
+	client, err := scim.NewClient(ctx,
+		scim.Params{
+			Common: scim.Common{
+				Host:         host,
+				ClientID:     clientID,
+				ClientSecret: clientSecret,
+			},
+			TLS: tlsConfig,
 		},
 	)
 	if err != nil {
 		fmt.Println("Error creating SCIM client:", err.Error())
 		os.Exit(1)
 	}
-
-	ctx := context.Background()
 
 	switch action {
 	case "GetUser":
@@ -105,7 +107,7 @@ func main() {
 	}
 }
 
-func getUser(ctx context.Context, client *scim.APIClient, id string) {
+func getUser(ctx context.Context, client *scim.Client, id string) {
 	user, err := client.GetUser(ctx, id)
 	if err != nil {
 		fmt.Println("Error getting user:", err.Error())
@@ -116,7 +118,7 @@ func getUser(ctx context.Context, client *scim.APIClient, id string) {
 }
 
 func listUsers(ctx context.Context,
-	client *scim.APIClient,
+	client *scim.Client,
 	useHTTPPost bool,
 	cursor string,
 	count int,
@@ -133,7 +135,7 @@ func listUsers(ctx context.Context,
 		filter = scim.NullFilterExpression{}
 	}
 
-	users, err := client.ListUsers(ctx, useHTTPPost, &filter, &cursor, &count)
+	users, err := client.ListUsers(ctx, useHTTPPost, filter, &cursor, &count)
 	if err != nil {
 		fmt.Println("Error listing users:", err.Error())
 		os.Exit(1)
@@ -146,7 +148,7 @@ func listUsers(ctx context.Context,
 	}
 }
 
-func getGroup(ctx context.Context, client *scim.APIClient, id string) {
+func getGroup(ctx context.Context, client *scim.Client, id string) {
 	if id == "" {
 		fmt.Println("ID is required for GetGroup action")
 		os.Exit(1)
@@ -163,7 +165,7 @@ func getGroup(ctx context.Context, client *scim.APIClient, id string) {
 
 func listGroups(
 	ctx context.Context,
-	client *scim.APIClient,
+	client *scim.Client,
 	useHTTPPost bool,
 	cursor string,
 	count int,
@@ -180,7 +182,7 @@ func listGroups(
 		filter = scim.NullFilterExpression{}
 	}
 
-	groups, err := client.ListGroups(ctx, useHTTPPost, &filter, &cursor, &count)
+	groups, err := client.ListGroups(ctx, useHTTPPost, filter, &cursor, &count)
 	if err != nil {
 		fmt.Println("Error listing groups:", err.Error())
 		os.Exit(1)
