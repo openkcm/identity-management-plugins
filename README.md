@@ -1,6 +1,6 @@
 [![REUSE status](https://api.reuse.software/badge/github.com/openkcm/identity-management-plugins)](https://api.reuse.software/info/github.com/openkcm/identity-management-plugins)
 
-# Identity Management PLugins
+# Identity Management Plugins
 
 TODO: write full set of description
 

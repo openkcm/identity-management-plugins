@@ -2,6 +2,7 @@
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
 #
 # Binaries for programs and plugins
+/bin
 *.exe
 *.exe~
 *.dll
@@ -24,6 +25,7 @@
 
 # Go vendor directory
 /vendor
+junit.xml
 
 # Go workspace file
 go.work
