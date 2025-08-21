@@ -2,11 +2,10 @@ package scim
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"os"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/openkcm/identity-management-plugins/pkg/config"
 	"github.com/samber/oops"
 	"gopkg.in/yaml.v3"
 
@@ -33,23 +32,9 @@ type Plugin struct {
 	idmangv1.UnsafeIdentityManagementServiceServer
 	configv1.UnsafeConfigServer
 
-	logger        hclog.Logger
-	scimClient    *scim.Client
-	requestParams RequestParams
-}
-
-type RequestParams struct {
-	GroupAttribute *string `json:"groupattribute"`
-	UserAttribute  *string `json:"userattribute"`
-}
-
-type Config struct {
-	ConnectCfg    scim.APIParams `json:"connectcfg"`
-	RequestParams RequestParams  `json:"requestparams"`
-}
-
-type Required struct {
-	CredentialFile string `yaml:"credentialfile"` //nolint:tagliatelle
+	logger     hclog.Logger
+	scimClient *scim.Client
+	config     *config.Config
 }
 
 var (
@@ -71,21 +56,16 @@ func (p *Plugin) Configure(
 ) (*configv1.ConfigureResponse, error) {
 	p.logger.Info("Configuring plugin")
 
-	var cfgReq Required
+	p.config = &config.Config{}
 
-	err := yaml.Unmarshal([]byte(req.GetYamlConfiguration()), &cfgReq)
+	cfg := p.config
+	err := yaml.Unmarshal([]byte(req.GetYamlConfiguration()), cfg)
 	if err != nil {
 		return nil, oops.In("Identity management Plugin").
 			Wrapf(err, "Failed to get yaml Configuration")
 	}
 
-	cfg, err := buildConfigFromRequest(&cfgReq)
-	if err != nil {
-		return nil, oops.In("Identity management Plugin").
-			Wrapf(err, "Failed to build config")
-	}
-
-	client, err := scim.NewClientFromAPI(ctx, cfg.ConnectCfg)
+	client, err := scim.NewClientFromAPI(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -103,8 +83,8 @@ func (p *Plugin) GetUsersForGroup(
 		return nil, ErrNoScimClient
 	}
 
-	filter := getFilter(defaultGroupsFilterAttribute, request.GetGroupId(),
-		p.requestParams.GroupAttribute)
+	attr := p.config.Params.GroupAttribute
+	filter := getFilter(defaultGroupsFilterAttribute, request.GetGroupId(), attr)
 
 	users, err := p.scimClient.ListUsers(ctx, true, filter, nil, nil)
 	if err != nil {
@@ -128,8 +108,8 @@ func (p *Plugin) GetGroupsForUser(
 		return nil, ErrNoScimClient
 	}
 
-	filter := getFilter(defaultUsersFilterAttribute, request.GetUserId(),
-		p.requestParams.UserAttribute)
+	attr := p.config.Params.UserAttribute
+	filter := getFilter(defaultUsersFilterAttribute, request.GetUserId(), attr)
 
 	groups, err := p.scimClient.ListGroups(ctx, true, filter, nil, nil)
 	if err != nil {
@@ -143,22 +123,6 @@ func (p *Plugin) GetGroupsForUser(
 	}
 
 	return &idmangv1.GetGroupsForUserResponse{Groups: responseGroups}, nil
-}
-
-func buildConfigFromRequest(cfgReq *Required) (Config, error) {
-	data, err := os.ReadFile(cfgReq.CredentialFile)
-	if err != nil {
-		return Config{}, err
-	}
-
-	var cfg Config
-
-	err = json.Unmarshal(data, &cfg)
-	if err != nil {
-		return Config{}, err
-	}
-
-	return cfg, nil
 }
 
 func getFilter(defaultAttribute, value string, setAttribute *string) scim.FilterExpression {

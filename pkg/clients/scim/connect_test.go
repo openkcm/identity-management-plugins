@@ -218,7 +218,7 @@ func TestNewClientFromAPI(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, err := scim.NewClientFromAPI(t.Context(), tt.params)
+			client, err := scim.NewClientFromAPI(tt.params)
 
 			if tt.expectError {
 				assert.Error(t, err)

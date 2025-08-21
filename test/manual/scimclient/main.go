@@ -11,7 +11,6 @@ import (
 	"os"
 
 	"github.com/openkcm/identity-management-plugins/pkg/clients/scim"
-	"github.com/openkcm/identity-management-plugins/pkg/utils/tlsconfig"
 )
 
 const usage = `Script to test SCIM API calls.

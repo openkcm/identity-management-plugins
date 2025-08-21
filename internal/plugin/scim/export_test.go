@@ -2,15 +2,15 @@ package scim
 
 import (
 	"github.com/openkcm/identity-management-plugins/pkg/clients/scim"
+	"github.com/openkcm/identity-management-plugins/pkg/config"
 )
 
 func (p *Plugin) SetTestClient(host string, groupFilterAttribute, userFilterAttribute *string) {
 	p.scimClient = &scim.Client{
-		Params: scim.Common{
-			Host: host,
-		},
+		Params: config.Params{},
 	}
-	p.requestParams = RequestParams{
+	p.config.Params = config.Params{
+		Host:           host,
 		GroupAttribute: groupFilterAttribute,
 		UserAttribute:  userFilterAttribute,
 	}
