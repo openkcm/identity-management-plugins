@@ -9,13 +9,13 @@ import (
 	"testing"
 
 	"github.com/magodo/slog2hclog"
+	"github.com/openkcm/common-sdk/pkg/pointers"
 	"github.com/stretchr/testify/assert"
 
 	idmangv1 "github.com/openkcm/plugin-sdk/proto/plugin/identity_management/v1"
 
 	plugin "github.com/openkcm/identity-management-plugins/internal/plugin/scim"
 	"github.com/openkcm/identity-management-plugins/pkg/clients/scim"
-	"github.com/openkcm/identity-management-plugins/pkg/utils/ptr"
 )
 
 const (
@@ -55,7 +55,7 @@ const (
 		`"totalResults":0,"itemsPerPage":1,"startIndex":0}`
 )
 
-var NonExistentFieldPtr *string = ptr.PointTo(NonExistentField)
+var NonExistentFieldPtr *string = pointers.To(NonExistentField)
 
 func setupTest(t *testing.T, url string,
 	groupFilterAttribute, userFilterAttribute *string) *plugin.Plugin {
@@ -129,8 +129,8 @@ func TestGetUsersForGroup(t *testing.T) {
 		{
 			name:                 "No filters",
 			serverUrl:            server.URL,
-			groupFilterAttribute: ptr.PointTo("displayName"),
-			groupFilterValue:     ptr.PointTo("None"),
+			groupFilterAttribute: pointers.To("displayName"),
+			groupFilterValue:     pointers.To("None"),
 			testNumUsers:         1,
 			testUserName:         "None",
 			testExpectedError:    nil,
@@ -138,7 +138,7 @@ func TestGetUsersForGroup(t *testing.T) {
 		{
 			name:                 "Non-existent filter value",
 			serverUrl:            server.URL,
-			groupFilterAttribute: ptr.PointTo("displayName"),
+			groupFilterAttribute: pointers.To("displayName"),
 			groupFilterValue:     NonExistentFieldPtr,
 			testNumUsers:         0,
 			testUserName:         "",
@@ -148,7 +148,7 @@ func TestGetUsersForGroup(t *testing.T) {
 			name:                 "Non-existent filter attribute",
 			serverUrl:            server.URL,
 			groupFilterAttribute: NonExistentFieldPtr,
-			groupFilterValue:     ptr.PointTo("None"),
+			groupFilterValue:     pointers.To("None"),
 			testNumUsers:         0,
 			testUserName:         "",
 			testExpectedError:    nil,
@@ -228,8 +228,8 @@ func TestGetGroupsForUser(t *testing.T) {
 		{
 			name:                "No filters",
 			serverUrl:           server.URL,
-			userFilterAttribute: ptr.PointTo("displayName"),
-			userFilterValue:     ptr.PointTo("None"),
+			userFilterAttribute: pointers.To("displayName"),
+			userFilterValue:     pointers.To("None"),
 			testNumGroups:       1,
 			testGroupName:       "KeyAdmin",
 			testExpectedError:   nil,
@@ -237,7 +237,7 @@ func TestGetGroupsForUser(t *testing.T) {
 		{
 			name:                "Non-existent filter value",
 			serverUrl:           server.URL,
-			userFilterAttribute: ptr.PointTo("displayName"),
+			userFilterAttribute: pointers.To("displayName"),
 			userFilterValue:     NonExistentFieldPtr,
 			testNumGroups:       0,
 			testGroupName:       "",
@@ -247,7 +247,7 @@ func TestGetGroupsForUser(t *testing.T) {
 			name:                "Non-existent filter attribute",
 			serverUrl:           server.URL,
 			userFilterAttribute: NonExistentFieldPtr,
-			userFilterValue:     ptr.PointTo("None"),
+			userFilterValue:     pointers.To("None"),
 			testNumGroups:       0,
 			testGroupName:       "",
 			testExpectedError:   nil,

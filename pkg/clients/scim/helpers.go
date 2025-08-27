@@ -9,8 +9,8 @@ import (
 	"net/url"
 	"strconv"
 
-	errs "github.com/openkcm/identity-management-plugins/pkg/utils/errs"
-	"github.com/openkcm/identity-management-plugins/pkg/utils/ptr"
+	"github.com/openkcm/common-sdk/pkg/pointers"
+	"github.com/openkcm/identity-management-plugins/pkg/utils/errs"
 )
 
 var (
@@ -37,7 +37,7 @@ func buildBodyFromParams(filter FilterExpression, count *int, cursor *string) (i
 		return nil, ErrNoFilter
 	}
 
-	searchRequest.Filter = ptr.PointTo((filter).ToString())
+	searchRequest.Filter = pointers.To(filter.ToString())
 
 	jsonBody, err := json.Marshal(searchRequest)
 	if err != nil {

@@ -3,20 +3,17 @@ package scim
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
 
 	"github.com/openkcm/common-sdk/pkg/commoncfg"
 	"github.com/openkcm/identity-management-plugins/pkg/config"
-	errs "github.com/openkcm/identity-management-plugins/pkg/utils/errs"
+	"github.com/openkcm/identity-management-plugins/pkg/utils/errs"
 	"github.com/openkcm/identity-management-plugins/pkg/utils/httpclient"
-
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/clientcredentials"
 )
 
 const (
@@ -27,7 +24,6 @@ const (
 	BasePathGroups = "/Groups"
 	BasePathUsers  = "/Users"
 	PostSearchPath = ".search"
-	GET_TOKEN_PATH = "/oauth/token"
 )
 
 var (
@@ -42,19 +38,62 @@ var (
 type Client struct {
 	httpClient *http.Client
 
-	scimHost string
+	scimHost  string
+	basicAuth *basicAuth
+}
+type basicAuth struct {
+	clientID     string
+	clientSecret string
 }
 
-func NewClientFromAPI(ctx context.Context, cfg *config.Config) (*Client, error) {
-	httpClient, err := createHTTPClient(ctx, cfg.Auth)
-	if err != nil {
-		return nil, err
+func (c *Client) doRequest(req *http.Request) (*http.Response, error) {
+	if c.basicAuth != nil {
+		basicCreds := []byte(c.basicAuth.clientID + ":" + c.basicAuth.clientSecret)
+		req.Header.Set("Authorization", "Basic "+base64.RawStdEncoding.EncodeToString(basicCreds))
 	}
 
-	return &Client{
-		httpClient: httpClient,
-		scimHost:   cfg.Host,
-	}, nil
+	return c.httpClient.Do(req)
+}
+
+func NewClientFromAPI(cfg *config.Config) (*Client, error) {
+	clientId, err := commoncfg.LoadValueFromSourceRef(cfg.Auth.Credentials.ClientID)
+	if err != nil {
+		return nil, errors.New("failed to load client id")
+	}
+	if cfg.Auth.Credentials.ClientSecret != nil {
+		clientSecret, err := commoncfg.LoadValueFromSourceRef(*cfg.Auth.Credentials.ClientSecret)
+		if err != nil {
+			return nil, errors.New("failed to load the client secret")
+		}
+
+		return &Client{
+			httpClient: &http.Client{},
+			scimHost:   cfg.Host,
+			basicAuth: &basicAuth{
+				clientID:     string(clientId),
+				clientSecret: string(clientSecret),
+			},
+		}, nil
+	}
+
+	if cfg.Auth.MTLS != nil {
+		cert, err := commoncfg.LoadMTLSClientCertificate(*cfg.Auth.MTLS)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse client certificate x509 pair")
+		}
+		return &Client{
+			httpClient: &http.Client{
+				Transport: &http.Transport{ // client cert auth
+					TLSClientConfig: &tls.Config{
+						Certificates: []tls.Certificate{*cert},
+					},
+				},
+			},
+			scimHost: cfg.Host,
+		}, nil
+	}
+
+	return nil, errors.New("failed to create the http client")
 }
 
 // GetUser retrieves a SCIM user by its ID.
@@ -197,7 +236,7 @@ func (c *Client) makeAPIRequest(
 		req.URL.RawQuery = *queryString
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.doRequest(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
@@ -232,67 +271,4 @@ func (c *Client) makeListRequest(
 	}
 
 	return c.makeAPIRequest(ctx, method, resourcePath, queryString, body)
-}
-
-func initClientCredsConfig(clientId, grantType string) *clientcredentials.Config {
-	clientConfig := &clientcredentials.Config{
-		ClientID:  clientId,
-		AuthStyle: oauth2.AuthStyleInParams,
-	}
-	clientConfig.EndpointParams = url.Values{
-		"grant_type": {grantType},
-	}
-
-	return clientConfig
-}
-
-func createHTTPClient(ctx context.Context, oauth2 commoncfg.OAuth2) (*http.Client, error) {
-	clientId, err := commoncfg.LoadValueFromSourceRef(oauth2.ClientID)
-	if err != nil {
-		return nil, errors.New("failed to load client id")
-	}
-	url, err := commoncfg.LoadValueFromSourceRef(oauth2.URL)
-	if err != nil {
-		return nil, errors.New("failed to load the oauth2 url")
-	}
-
-	if oauth2.MTLS != nil {
-		return getX509Client(ctx, string(url), string(clientId), oauth2.MTLS)
-	}
-
-	if oauth2.ClientSecret != nil {
-		clientSecret, err := commoncfg.LoadValueFromSourceRef(*oauth2.ClientSecret)
-		if err != nil {
-			return nil, errors.New("failed to load client secret")
-		}
-
-		clientConfig := initClientCredsConfig(string(clientId), "client_credentials")
-		clientConfig.ClientSecret = string(clientSecret)
-		clientConfig.TokenURL = string(url) + GET_TOKEN_PATH
-
-		return clientConfig.Client(ctx), nil
-	}
-
-	return nil, errors.New("failed to create the http client")
-}
-
-func getX509Client(ctx context.Context, url, clientId string, mtls *commoncfg.MTLS) (*http.Client, error) {
-	clientConfig := initClientCredsConfig(clientId, "client_x509")
-	clientConfig.TokenURL = url + GET_TOKEN_PATH
-
-	cert, err := commoncfg.LoadMTLSClientCertificate(*mtls)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse client certificate x509 pair")
-	}
-
-	tokenBaseClient := &http.Client{
-		Transport: &http.Transport{ // client cert auth
-			TLSClientConfig: &tls.Config{
-				Certificates: []tls.Certificate{*cert},
-			},
-		},
-	}
-
-	ctx = context.WithValue(ctx, oauth2.HTTPClient, tokenBaseClient)
-	return clientConfig.Client(ctx), nil
 }

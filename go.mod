@@ -5,10 +5,10 @@ go 1.24.5
 require (
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/magodo/slog2hclog v0.0.0-20240614031327-090ebd72a033
-	github.com/openkcm/common-sdk v1.2.2
+	github.com/openkcm/common-sdk v1.2.3
 	github.com/openkcm/plugin-sdk v0.5.0
 	github.com/samber/oops v1.19.0
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.0
 	golang.org/x/oauth2 v0.30.0
 	gopkg.in/yaml.v3 v3.0.1
 )
