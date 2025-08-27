@@ -21,6 +21,14 @@ func NewTestPlugin() *TestPlugin {
 	return &TestPlugin{}
 }
 
+func (p *TestPlugin) GetAllGroups(
+	ctx context.Context,
+	request *idmangv1.GetAllGroupsRequest,
+) (*idmangv1.GetAllGroupsResponse, error) {
+	p.logger.Info("GetAllGroups method has been called;")
+	return &idmangv1.GetAllGroupsResponse{}, nil
+}
+
 func (p *TestPlugin) GetUsersForGroup(
 	ctx context.Context,
 	request *idmangv1.GetUsersForGroupRequest,
