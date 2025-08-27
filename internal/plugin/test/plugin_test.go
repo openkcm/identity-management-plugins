@@ -23,6 +23,22 @@ func setupTest() *tp.TestPlugin {
 	return p
 }
 
+func TestGetAllGroups(t *testing.T) {
+	p := setupTest()
+
+	responseMsg, err := p.GetAllGroups(context.Background(),
+		&idmangv1.GetAllGroupsRequest{})
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	assert.Equal(
+		t,
+		&idmangv1.GetAllGroupsResponse{},
+		responseMsg,
+	)
+}
+
 func TestGetUsersForGroup(t *testing.T) {
 	p := setupTest()
 

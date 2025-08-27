@@ -22,6 +22,7 @@ var (
 	ErrPluginCreation   = errors.New("failed to create plugin")
 	ErrGetGroupsForUser = errors.New("failed to get groups for user")
 	ErrGetUsersForGroup = errors.New("failed to get users for group")
+	ErrNoID             = errors.New("no filter id provided")
 )
 
 const defaultFilterAttribute = "displayName"
@@ -95,6 +96,24 @@ func (p *Plugin) Configure(
 	return &configv1.ConfigureResponse{}, nil
 }
 
+func (p *Plugin) GetAllGroups(
+	ctx context.Context,
+	request *idmangv1.GetAllGroupsRequest,
+) (*idmangv1.GetAllGroupsResponse, error) {
+	groups, err := p.scimClient.ListGroups(ctx, false, scim.NullFilterExpression{}, nil, nil)
+	if err != nil {
+		return nil, errs.Wrap(ErrGetGroupsForUser, err)
+	}
+
+	responseGroups := make([]*idmangv1.Group, len(groups.Resources))
+
+	for i, group := range groups.Resources {
+		responseGroups[i] = &idmangv1.Group{Name: group.DisplayName}
+	}
+
+	return &idmangv1.GetAllGroupsResponse{Groups: responseGroups}, nil
+}
+
 func (p *Plugin) GetUsersForGroup(
 	ctx context.Context,
 	request *idmangv1.GetUsersForGroupRequest,
@@ -105,6 +124,10 @@ func (p *Plugin) GetUsersForGroup(
 
 	filter := getFilter(defaultGroupsFilterAttribute, request.GetGroupId(),
 		p.requestParams.GroupAttribute)
+
+	if (filter == scim.NullFilterExpression{}) {
+		return nil, errs.Wrap(ErrGetUsersForGroup, ErrNoID)
+	}
 
 	users, err := p.scimClient.ListUsers(ctx, true, filter, nil, nil)
 	if err != nil {
@@ -130,6 +153,10 @@ func (p *Plugin) GetGroupsForUser(
 
 	filter := getFilter(defaultUsersFilterAttribute, request.GetUserId(),
 		p.requestParams.UserAttribute)
+
+	if (filter == scim.NullFilterExpression{}) {
+		return nil, errs.Wrap(ErrGetGroupsForUser, ErrNoID)
+	}
 
 	groups, err := p.scimClient.ListGroups(ctx, true, filter, nil, nil)
 	if err != nil {

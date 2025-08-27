@@ -89,6 +89,67 @@ func TestNoScimClient(t *testing.T) {
 	assert.ErrorIs(t, err, plugin.ErrNoScimClient)
 }
 
+func TestGetAllGroups(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte(ListGroupsResponse))
+
+		assert.NoError(t, err)
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	tests := []struct {
+		name              string
+		serverUrl         string
+		testNumGroups     int
+		testGroupName     string
+		testExpectedError *error
+	}{
+		{
+			name:              "Bad Server",
+			serverUrl:         "badurl",
+			testNumGroups:     0,
+			testGroupName:     "",
+			testExpectedError: &scim.ErrListGroups,
+		},
+		{
+			name:              "Good request",
+			serverUrl:         server.URL,
+			testNumGroups:     1,
+			testGroupName:     "KeyAdmin",
+			testExpectedError: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := setupTest(t, tt.serverUrl, nil, nil)
+
+			responseMsg, err := p.GetAllGroups(t.Context(),
+				&idmangv1.GetAllGroupsRequest{})
+
+			if tt.testExpectedError == nil {
+				assert.NoError(t, err)
+				assert.Len(t, responseMsg.GetGroups(), tt.testNumGroups)
+
+				if tt.testNumGroups > 0 {
+					assert.Equal(
+						t,
+						&idmangv1.GetAllGroupsResponse{
+							Groups: []*idmangv1.Group{{
+								Name: tt.testGroupName}},
+						},
+						responseMsg,
+					)
+				}
+			} else {
+				assert.ErrorIs(t, err, *tt.testExpectedError)
+			}
+		})
+	}
+}
+
 func TestGetUsersForGroup(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		bodyBytes, err := io.ReadAll(r.Body)
@@ -120,14 +181,14 @@ func TestGetUsersForGroup(t *testing.T) {
 		{
 			name:                 "Bad Server",
 			serverUrl:            "badurl",
-			groupFilterAttribute: nil,
-			groupFilterValue:     nil,
+			groupFilterAttribute: ptr.PointTo("displayName"),
+			groupFilterValue:     ptr.PointTo("None"),
 			testNumUsers:         0,
 			testUserName:         "",
 			testExpectedError:    &scim.ErrListUsers,
 		},
 		{
-			name:                 "No filters",
+			name:                 "Good request",
 			serverUrl:            server.URL,
 			groupFilterAttribute: ptr.PointTo("displayName"),
 			groupFilterValue:     ptr.PointTo("None"),
@@ -219,14 +280,14 @@ func TestGetGroupsForUser(t *testing.T) {
 		{
 			name:                "Bad Server",
 			serverUrl:           "badurl",
-			userFilterAttribute: nil,
-			userFilterValue:     nil,
+			userFilterAttribute: ptr.PointTo("displayName"),
+			userFilterValue:     ptr.PointTo("None"),
 			testNumGroups:       0,
 			testGroupName:       "",
 			testExpectedError:   &scim.ErrListGroups,
 		},
 		{
-			name:                "No filters",
+			name:                "Good request",
 			serverUrl:           server.URL,
 			userFilterAttribute: ptr.PointTo("displayName"),
 			userFilterValue:     ptr.PointTo("None"),

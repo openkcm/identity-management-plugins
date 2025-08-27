@@ -6,7 +6,7 @@ includes:
     flatten: true
     excludes: [] # put task names in here which are overwritten in this file
     vars:
-      CODE_DIRS: '{{.ROOT_DIR}}/cmd/... {{.ROOT_DIR}}/internal/... {{.ROOT_DIR}}/tests/...'
+      CODE_DIRS: '{{.ROOT_DIR}}/cmd/... {{.ROOT_DIR}}/internal/... {{.ROOT_DIR}}/pkg/...'
       COMPONENTS: 'scim'
       REPO_URL: 'https://github.com/openkcm/identity-management-plugins'
       GENERATE_DOCS_INDEX: "false"
