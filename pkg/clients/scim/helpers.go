@@ -54,28 +54,3 @@ func buildQueryStringFromParams(filter FilterExpression, cursor *string, count *
 
 	return query.Encode()
 }
-
-func buildQueryStringAndBody(
-	useHTTPPost bool,
-	filter FilterExpression,
-	cursor *string,
-	count *int,
-) (*io.Reader, *string, error) {
-	var (
-		body        io.Reader
-		queryString string
-		err         error
-	)
-
-	if useHTTPPost {
-		body, err = buildBodyFromParams(filter, count, cursor)
-	} else {
-		queryString = buildQueryStringFromParams(filter, cursor, count)
-	}
-
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return &body, &queryString, nil
-}

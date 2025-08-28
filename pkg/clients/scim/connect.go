@@ -11,6 +11,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/openkcm/common-sdk/pkg/commoncfg"
+	"github.com/openkcm/common-sdk/pkg/pointers"
 	"github.com/openkcm/identity-management-plugins/pkg/config"
 	"github.com/openkcm/identity-management-plugins/pkg/utils/errs"
 	"github.com/openkcm/identity-management-plugins/pkg/utils/httpclient"
@@ -33,7 +34,6 @@ var (
 	ErrListUsers                = errors.New("error listing SCIM users")
 	ErrGetGroup                 = errors.New("error getting SCIM group")
 	ErrListGroups               = errors.New("error listing SCIM groups")
-	ErrAuthParams               = errors.New("must provide client secret or TLS config")
 	ErrHttpCreation             = errors.New("failed to create the http client")
 	ErrClientID                 = errors.New("failed to load the client id")
 	ErrClientSecret             = errors.New("failed to load the client secret")
@@ -44,7 +44,7 @@ type Client struct {
 	logger     hclog.Logger
 	httpClient *http.Client
 
-	scimHost  string
+	host      string
 	basicAuth *basicAuth
 }
 type basicAuth struct {
@@ -74,7 +74,7 @@ func NewClientFromAPI(cfg *config.Config, logger hclog.Logger) (*Client, error) 
 	}
 
 	if cfg.Auth.Credentials.ClientSecret != nil {
-		clientSecret, err := commoncfg.LoadValueFromSourceRef(*cfg.Auth.Credentials.ClientSecret)
+		clientSecret, err := commoncfg.ExtractValueFromSourceRef(cfg.Auth.Credentials.ClientSecret)
 		if err != nil {
 			return nil, ErrClientSecret
 		}
@@ -82,7 +82,7 @@ func NewClientFromAPI(cfg *config.Config, logger hclog.Logger) (*Client, error) 
 		return &Client{
 			logger:     logger,
 			httpClient: &http.Client{},
-			scimHost:   cfg.Host,
+			host:       cfg.Host,
 			basicAuth: &basicAuth{
 				clientID:     string(clientId),
 				clientSecret: string(clientSecret),
@@ -104,7 +104,7 @@ func NewClientFromAPI(cfg *config.Config, logger hclog.Logger) (*Client, error) 
 					},
 				},
 			},
-			scimHost: cfg.Host,
+			host: cfg.Host,
 		}, nil
 	}
 
@@ -113,8 +113,7 @@ func NewClientFromAPI(cfg *config.Config, logger hclog.Logger) (*Client, error) 
 
 // GetUser retrieves a SCIM user by its ID.
 func (c *Client) GetUser(ctx context.Context, id string) (*User, error) {
-	resourcePath := BasePathUsers + "/" + id
-	resp, err := c.makeAPIRequest(ctx, http.MethodGet, resourcePath, nil, nil)
+	resp, err := c.baseCreateAndExecuteHTTPRequest(ctx, http.MethodGet, BasePathUsers+"/"+id, nil, nil)
 
 	if resp != nil {
 		defer func() {
@@ -142,24 +141,22 @@ func (c *Client) GetUser(ctx context.Context, id string) (*User, error) {
 // The useHTTPPost parameter determines whether to use POST method + /.search path for the request.
 func (c *Client) ListUsers(
 	ctx context.Context,
-	useHTTPPost bool,
+	method string,
 	filter FilterExpression,
 	cursor *string,
 	count *int,
 ) (*UserList, error) {
-	resp, err := c.makeListRequest(ctx, useHTTPPost, BasePathUsers, filter, cursor, count)
-	if resp != nil {
-		defer func() {
-			err := resp.Body.Close()
-			if err != nil {
-				c.logger.Error("failed to close ListUsers response body", "error", err)
-			}
-		}()
-	}
-
+	resp, err := c.createAndExecuteHTTPRequest(ctx, method, BasePathUsers, filter, cursor, count)
 	if err != nil {
 		return nil, errs.Wrap(ErrListUsers, err)
 	}
+
+	defer func() {
+		err := resp.Body.Close()
+		if err != nil {
+			c.logger.Error("failed to close ListUsers response body", "error", err)
+		}
+	}()
 
 	users, err := httpclient.DecodeResponse[UserList](ctx, "SCIM", resp, http.StatusOK)
 	if err != nil {
@@ -171,8 +168,7 @@ func (c *Client) ListUsers(
 
 // GetGroup retrieves a SCIM group by its ID.
 func (c *Client) GetGroup(ctx context.Context, id string) (*Group, error) {
-	resourcePath := BasePathGroups + "/" + id
-	resp, err := c.makeAPIRequest(ctx, http.MethodGet, resourcePath, nil, nil)
+	resp, err := c.baseCreateAndExecuteHTTPRequest(ctx, http.MethodGet, BasePathGroups+"/"+id, nil, nil)
 
 	if resp != nil {
 		defer func() {
@@ -200,12 +196,12 @@ func (c *Client) GetGroup(ctx context.Context, id string) (*Group, error) {
 // The useHTTPPost parameter determines whether to use POST method + /.search path for the request.
 func (c *Client) ListGroups(
 	ctx context.Context,
-	useHTTPPost bool,
+	method string,
 	filter FilterExpression,
 	cursor *string,
 	count *int,
 ) (*GroupList, error) {
-	resp, err := c.makeListRequest(ctx, useHTTPPost, BasePathGroups, filter, cursor, count)
+	resp, err := c.createAndExecuteHTTPRequest(ctx, method, BasePathGroups, filter, cursor, count)
 
 	if resp != nil {
 		defer func() {
@@ -228,19 +224,14 @@ func (c *Client) ListGroups(
 	return groups, nil
 }
 
-func (c *Client) makeAPIRequest(
+func (c *Client) baseCreateAndExecuteHTTPRequest(
 	ctx context.Context,
 	method string,
 	resourcePath string,
 	queryString *string,
-	body *io.Reader,
+	body io.Reader,
 ) (*http.Response, error) {
-	var requestBody io.Reader
-	if body != nil {
-		requestBody = *body
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, c.scimHost+resourcePath, requestBody)
+	req, err := http.NewRequestWithContext(ctx, method, c.host+resourcePath, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -257,31 +248,36 @@ func (c *Client) makeAPIRequest(
 	return resp, nil
 }
 
-// makeListRequest creates a request to list SCIM resources (users or groups).
+// createAndExecuteHTTPRequest create a request to list SCIM resources (users or groups).
 // It uses either GET or POST method based on the useHTTPPost parameter.
 // It builds the request with the provided filter, cursor, and count parameters.
 // For GET method, parameters are added to the query string.
 // For POST method, parameters are included in the request body.
-func (c *Client) makeListRequest(
+func (c *Client) createAndExecuteHTTPRequest(
 	ctx context.Context,
-	useHTTPPost bool,
+	method string,
 	basePath string,
 	filter FilterExpression,
 	cursor *string,
 	count *int,
 ) (*http.Response, error) {
 	resourcePath := basePath + "/"
-	method := http.MethodGet
 
-	if useHTTPPost {
+	var (
+		body        io.Reader
+		queryString string
+	)
+
+	if method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch {
 		resourcePath += PostSearchPath
-		method = http.MethodPost
+		var err error
+		body, err = buildBodyFromParams(filter, count, cursor)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build request: %w", err)
+		}
+	} else {
+		queryString = buildQueryStringFromParams(filter, cursor, count)
 	}
 
-	body, queryString, err := buildQueryStringAndBody(useHTTPPost, filter, cursor, count)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build request: %w", err)
-	}
-
-	return c.makeAPIRequest(ctx, method, resourcePath, queryString, body)
+	return c.baseCreateAndExecuteHTTPRequest(ctx, method, resourcePath, pointers.String(queryString), body)
 }

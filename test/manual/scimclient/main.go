@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net/http"
 	"os"
 
 	"github.com/openkcm/identity-management-plugins/pkg/clients/scim"
@@ -91,15 +92,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	method := http.MethodGet
+	if useHTTPPost {
+		method = http.MethodPost
+	}
+
 	switch action {
 	case "GetUser":
 		getUser(ctx, client, id)
 	case "ListUsers":
-		listUsers(ctx, client, useHTTPPost, cursor, count, displayName)
+		listUsers(ctx, client, method, cursor, count, displayName)
 	case "GetGroup":
 		getGroup(ctx, client, id)
 	case "ListGroups":
-		listGroups(ctx, client, useHTTPPost, cursor, count, displayName)
+		listGroups(ctx, client, method, cursor, count, displayName)
 	default:
 		fmt.Println("Invalid action. Supported actions are: GetUser, ListUsers, GetGroup, ListGroups")
 		os.Exit(1)
@@ -118,7 +124,7 @@ func getUser(ctx context.Context, client *scim.Client, id string) {
 
 func listUsers(ctx context.Context,
 	client *scim.Client,
-	useHTTPPost bool,
+	method string,
 	cursor string,
 	count int,
 	displayName string,
@@ -134,7 +140,7 @@ func listUsers(ctx context.Context,
 		filter = scim.NullFilterExpression{}
 	}
 
-	users, err := client.ListUsers(ctx, useHTTPPost, filter, &cursor, &count)
+	users, err := client.ListUsers(ctx, method, filter, &cursor, &count)
 	if err != nil {
 		fmt.Println("Error listing users:", err.Error())
 		os.Exit(1)
@@ -165,7 +171,7 @@ func getGroup(ctx context.Context, client *scim.Client, id string) {
 func listGroups(
 	ctx context.Context,
 	client *scim.Client,
-	useHTTPPost bool,
+	method string,
 	cursor string,
 	count int,
 	displayName string,
@@ -181,7 +187,7 @@ func listGroups(
 		filter = scim.NullFilterExpression{}
 	}
 
-	groups, err := client.ListGroups(ctx, useHTTPPost, filter, &cursor, &count)
+	groups, err := client.ListGroups(ctx, method, filter, &cursor, &count)
 	if err != nil {
 		fmt.Println("Error listing groups:", err.Error())
 		os.Exit(1)

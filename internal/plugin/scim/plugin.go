@@ -3,6 +3,7 @@ package scim
 import (
 	"context"
 	"errors"
+	"net/http"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/openkcm/identity-management-plugins/pkg/config"
@@ -85,7 +86,7 @@ func (p *Plugin) GetUsersForGroup(
 	attr := p.config.Params.GroupAttribute
 	filter := getFilter(defaultGroupsFilterAttribute, request.GetGroupId(), attr)
 
-	users, err := p.scimClient.ListUsers(ctx, true, filter, nil, nil)
+	users, err := p.scimClient.ListUsers(ctx, http.MethodPost, filter, nil, nil)
 	if err != nil {
 		return nil, errs.Wrap(ErrGetUsersForGroup, err)
 	}
@@ -110,7 +111,7 @@ func (p *Plugin) GetGroupsForUser(
 	attr := p.config.Params.UserAttribute
 	filter := getFilter(defaultUsersFilterAttribute, request.GetUserId(), attr)
 
-	groups, err := p.scimClient.ListGroups(ctx, true, filter, nil, nil)
+	groups, err := p.scimClient.ListGroups(ctx, http.MethodPost, filter, nil, nil)
 	if err != nil {
 		return nil, errs.Wrap(ErrGetGroupsForUser, err)
 	}
