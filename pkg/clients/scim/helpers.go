@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"net/http"
 	"net/url"
 	"strconv"
 
@@ -17,14 +16,6 @@ var (
 	ErrNoFilter     = errors.New("filter not provided")
 	ErrMarshallFail = errors.New("failed to marshal search request")
 )
-
-func setSCIMHeaders(req *http.Request) {
-	if req.Method == http.MethodPost || req.Method == http.MethodPut || req.Method == http.MethodPatch {
-		req.Header.Set("Content-Type", ApplicationSCIMJson)
-	}
-
-	req.Header.Set("Accept", ApplicationSCIMJson)
-}
 
 func buildBodyFromParams(filter FilterExpression, count *int, cursor *string) (io.Reader, error) {
 	searchRequest := SearchRequest{

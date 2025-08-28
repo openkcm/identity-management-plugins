@@ -7,9 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/openkcm/common-sdk/pkg/commoncfg"
 	"github.com/openkcm/identity-management-plugins/pkg/config"
 	"github.com/openkcm/identity-management-plugins/pkg/utils/errs"
@@ -24,18 +24,24 @@ const (
 	BasePathGroups = "/Groups"
 	BasePathUsers  = "/Users"
 	PostSearchPath = ".search"
+
+	HeaderAuthorization = "Authorization"
 )
 
 var (
-	ErrGetUser         = errors.New("error getting SCIM user")
-	ErrListUsers       = errors.New("error listing SCIM users")
-	ErrGetGroup        = errors.New("error getting SCIM group")
-	ErrListGroups      = errors.New("error listing SCIM groups")
-	ErrClientIDMissing = errors.New("client ID is required")
-	ErrAuthParams      = errors.New("must provide client secret or TLS config")
+	ErrGetUser                  = errors.New("error getting SCIM user")
+	ErrListUsers                = errors.New("error listing SCIM users")
+	ErrGetGroup                 = errors.New("error getting SCIM group")
+	ErrListGroups               = errors.New("error listing SCIM groups")
+	ErrAuthParams               = errors.New("must provide client secret or TLS config")
+	ErrHttpCreation             = errors.New("failed to create the http client")
+	ErrClientID                 = errors.New("failed to load the client id")
+	ErrClientSecret             = errors.New("failed to load the client secret")
+	ErrParsingClientCertificate = errors.New("failed to parse client certificate x509 pair")
 )
 
 type Client struct {
+	logger     hclog.Logger
 	httpClient *http.Client
 
 	scimHost  string
@@ -47,26 +53,34 @@ type basicAuth struct {
 }
 
 func (c *Client) doRequest(req *http.Request) (*http.Response, error) {
+	if req.Method == http.MethodPost || req.Method == http.MethodPut || req.Method == http.MethodPatch {
+		req.Header.Set("Content-Type", ApplicationSCIMJson)
+	}
+
+	req.Header.Set("Accept", ApplicationSCIMJson)
+
 	if c.basicAuth != nil {
 		basicCreds := []byte(c.basicAuth.clientID + ":" + c.basicAuth.clientSecret)
-		req.Header.Set("Authorization", "Basic "+base64.RawStdEncoding.EncodeToString(basicCreds))
+		req.Header.Set(HeaderAuthorization, "Basic "+base64.RawStdEncoding.EncodeToString(basicCreds))
 	}
 
 	return c.httpClient.Do(req)
 }
 
-func NewClientFromAPI(cfg *config.Config) (*Client, error) {
+func NewClientFromAPI(cfg *config.Config, logger hclog.Logger) (*Client, error) {
 	clientId, err := commoncfg.LoadValueFromSourceRef(cfg.Auth.Credentials.ClientID)
 	if err != nil {
-		return nil, errors.New("failed to load client id")
+		return nil, ErrClientID
 	}
+
 	if cfg.Auth.Credentials.ClientSecret != nil {
 		clientSecret, err := commoncfg.LoadValueFromSourceRef(*cfg.Auth.Credentials.ClientSecret)
 		if err != nil {
-			return nil, errors.New("failed to load the client secret")
+			return nil, ErrClientSecret
 		}
 
 		return &Client{
+			logger:     logger,
 			httpClient: &http.Client{},
 			scimHost:   cfg.Host,
 			basicAuth: &basicAuth{
@@ -77,11 +91,12 @@ func NewClientFromAPI(cfg *config.Config) (*Client, error) {
 	}
 
 	if cfg.Auth.MTLS != nil {
-		cert, err := commoncfg.LoadMTLSClientCertificate(*cfg.Auth.MTLS)
+		cert, err := commoncfg.LoadMTLSClientCertificate(cfg.Auth.MTLS)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse client certificate x509 pair")
+			return nil, ErrParsingClientCertificate
 		}
 		return &Client{
+			logger: logger,
 			httpClient: &http.Client{
 				Transport: &http.Transport{ // client cert auth
 					TLSClientConfig: &tls.Config{
@@ -93,7 +108,7 @@ func NewClientFromAPI(cfg *config.Config) (*Client, error) {
 		}, nil
 	}
 
-	return nil, errors.New("failed to create the http client")
+	return nil, ErrHttpCreation
 }
 
 // GetUser retrieves a SCIM user by its ID.
@@ -105,7 +120,7 @@ func (c *Client) GetUser(ctx context.Context, id string) (*User, error) {
 		defer func() {
 			err := resp.Body.Close()
 			if err != nil {
-				slog.ErrorContext(ctx, "failed to close GetUser response body", "error", err)
+				c.logger.Error("failed to close GetUser response body", "error", err)
 			}
 		}()
 	}
@@ -137,7 +152,7 @@ func (c *Client) ListUsers(
 		defer func() {
 			err := resp.Body.Close()
 			if err != nil {
-				slog.ErrorContext(ctx, "failed to close ListUsers response body", "error", err)
+				c.logger.Error("failed to close ListUsers response body", "error", err)
 			}
 		}()
 	}
@@ -163,7 +178,7 @@ func (c *Client) GetGroup(ctx context.Context, id string) (*Group, error) {
 		defer func() {
 			err := resp.Body.Close()
 			if err != nil {
-				slog.ErrorContext(ctx, "failed to close GetGroup response body", "error", err)
+				c.logger.Error("failed to close GetGroup response body", "error", err)
 			}
 		}()
 	}
@@ -196,7 +211,7 @@ func (c *Client) ListGroups(
 		defer func() {
 			err := resp.Body.Close()
 			if err != nil {
-				slog.ErrorContext(ctx, "failed to close ListGroups response body", "error", err)
+				c.logger.Error("failed to close ListGroups response body", "error", err)
 			}
 		}()
 	}
@@ -229,8 +244,6 @@ func (c *Client) makeAPIRequest(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-
-	setSCIMHeaders(req)
 
 	if queryString != nil {
 		req.URL.RawQuery = *queryString

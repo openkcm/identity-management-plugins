@@ -58,14 +58,13 @@ func (p *Plugin) Configure(
 
 	p.config = &config.Config{}
 
-	cfg := p.config
-	err := yaml.Unmarshal([]byte(req.GetYamlConfiguration()), cfg)
+	err := yaml.Unmarshal([]byte(req.GetYamlConfiguration()), p.config)
 	if err != nil {
 		return nil, oops.In("Identity management Plugin").
 			Wrapf(err, "Failed to get yaml Configuration")
 	}
 
-	client, err := scim.NewClientFromAPI(ctx, cfg)
+	client, err := scim.NewClientFromAPI(p.config, p.logger)
 	if err != nil {
 		return nil, err
 	}
