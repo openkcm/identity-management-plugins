@@ -1,14 +1,18 @@
 package scim_test
 
 import (
-	"crypto/tls"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/magodo/slog2hclog"
+	"github.com/openkcm/common-sdk/pkg/commoncfg"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/openkcm/identity-management-plugins/pkg/clients/scim"
+	"github.com/openkcm/identity-management-plugins/pkg/config"
 )
 
 const (
@@ -93,63 +97,96 @@ var (
 	}
 )
 
+func getLogger() hclog.Logger {
+	logLevelPlugin := new(slog.LevelVar)
+	logLevelPlugin.Set(slog.LevelError)
+
+	return slog2hclog.New(slog.Default(), logLevelPlugin)
+}
+
+func getBasicClient(url string) *scim.Client {
+	client, _ := scim.NewClient(
+		&config.Config{
+			Host: url,
+			Auth: commoncfg.SecretRef{
+				Type: commoncfg.BasicSecretType,
+				Basic: commoncfg.BasicAuth{
+					Username: commoncfg.SourceRef{
+						Source: commoncfg.EmbeddedSourceValue,
+						Value:  ""},
+					Password: commoncfg.SourceRef{
+						Source: commoncfg.EmbeddedSourceValue,
+						Value:  ""},
+				},
+			},
+		}, getLogger())
+
+	return client
+}
+
 func TestNewClient(t *testing.T) {
 	tests := []struct {
 		name          string
-		params        scim.Params
+		config        config.Config
 		expectError   bool
 		errorContains string
 	}{
 		{
-			name: "Missing Client ID",
-			params: scim.Params{
-				Common: scim.Common{
-					Host: "https://example.com",
+			name: "Non-supported auth",
+			config: config.Config{
+				Host: "http://example.com",
+				Auth: commoncfg.SecretRef{
+					Type: commoncfg.OAuth2SecretType,
 				},
-				TLS: &tls.Config{},
 			},
 			expectError:   true,
-			errorContains: "client ID is required",
+			errorContains: "API Auth not implemented",
 		},
 		{
-			name: "Valid Client Secret",
-			params: scim.Params{
-				Common: scim.Common{
-					Host:         "https://example.com",
-					ClientID:     "test-client",
-					ClientSecret: "unreal",
+			name: "Basic auth",
+			config: config.Config{
+				Host: "http://example.com",
+				Auth: commoncfg.SecretRef{
+					Type: commoncfg.BasicSecretType,
+					Basic: commoncfg.BasicAuth{
+						Username: commoncfg.SourceRef{
+							Source: commoncfg.EmbeddedSourceValue,
+							Value:  ""},
+						Password: commoncfg.SourceRef{
+							Source: commoncfg.EmbeddedSourceValue,
+							Value:  ""},
+					},
 				},
-				TLS: &tls.Config{},
 			},
 			expectError: false,
 		},
 		{
-			name: "Valid TLSConfig",
-			params: scim.Params{
-				Common: scim.Common{
-					Host:     "https://example.com",
-					ClientID: "test-client",
-				},
-				TLS: &tls.Config{},
-			},
-			expectError: false,
-		},
-		{
-			name: "Missing Client Secret and TLS Config",
-			params: scim.Params{
-				Common: scim.Common{
-					Host:     "https://example.com",
-					ClientID: "test-client",
+			name: "MTLS auth with bad cert",
+			config: config.Config{
+				Host: "http://example.com",
+				Auth: commoncfg.SecretRef{
+					Type: commoncfg.MTLSSecretType,
+					MTLS: commoncfg.MTLS{
+						Cert: commoncfg.SourceRef{
+							Source: commoncfg.EmbeddedSourceValue,
+							Value:  "bad"},
+						CertKey: commoncfg.SourceRef{
+							Source: commoncfg.EmbeddedSourceValue,
+							Value:  "bad"},
+						ServerCA: commoncfg.SourceRef{
+							Source: commoncfg.EmbeddedSourceValue,
+							Value:  "bad"},
+					},
 				},
 			},
 			expectError:   true,
-			errorContains: "must provide client secret or TLS config",
+			errorContains: "failed to parse client certificate x509 pair",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, err := scim.NewClient(t.Context(), tt.params)
+			client, err := scim.NewClient(&tt.config, getLogger())
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -163,76 +200,7 @@ func TestNewClient(t *testing.T) {
 	}
 }
 
-func TestNewClientFromAPI(t *testing.T) {
-	tests := []struct {
-		name          string
-		params        scim.APIParams
-		expectError   bool
-		errorContains string
-	}{
-		{
-			name: "Missing Client ID",
-			params: scim.APIParams{
-				Common: scim.Common{
-					Host: "https://example.com",
-				},
-				TLS: &scim.TLSParams{},
-			},
-			expectError:   true,
-			errorContains: "client ID is required",
-		},
-		{
-			name: "Valid Client Secret",
-			params: scim.APIParams{
-				Common: scim.Common{
-					Host:         "https://example.com",
-					ClientID:     "test-client",
-					ClientSecret: "unreal",
-				},
-			},
-			expectError: false,
-		},
-		{
-			name: "Non existent TLSConfig files",
-			params: scim.APIParams{
-				Common: scim.Common{
-					Host:     "https://example.com",
-					ClientID: "test-client",
-				},
-				TLS: &scim.TLSParams{"test_cert.cer", "test_key.key"},
-			},
-			expectError: true,
-		},
-		{
-			name: "Missing Client Secret and TLS Config",
-			params: scim.APIParams{
-				Common: scim.Common{
-					Host:     "https://example.com",
-					ClientID: "test-client",
-				},
-			},
-			expectError:   true,
-			errorContains: "must provide client secret or TLS config",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			client, err := scim.NewClientFromAPI(t.Context(), tt.params)
-
-			if tt.expectError {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errorContains)
-				assert.Nil(t, client)
-			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, client)
-			}
-		})
-	}
-}
-
-func TestAPIClient_GetUser(t *testing.T) {
+func TestGetUser(t *testing.T) {
 	tests := []struct {
 		name           string
 		userID         string
@@ -279,14 +247,7 @@ func TestAPIClient_GetUser(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client, _ := scim.NewClient(t.Context(), scim.Params{
-				Common: scim.Common{
-					Host:         server.URL,
-					ClientID:     "test-client",
-					ClientSecret: "unreal",
-				},
-				TLS: &tls.Config{},
-			})
+			client := getBasicClient(server.URL)
 
 			user, err := client.GetUser(t.Context(), tt.userID)
 
@@ -302,10 +263,10 @@ func TestAPIClient_GetUser(t *testing.T) {
 	}
 }
 
-func TestAPIClient_ListUsers(t *testing.T) {
+func TestListUsers(t *testing.T) {
 	tests := []struct {
 		name           string
-		useHTTPPost    bool
+		method         string
 		responseStatus int
 		responseBody   string
 		expectedUsers  *scim.UserList
@@ -321,7 +282,7 @@ func TestAPIClient_ListUsers(t *testing.T) {
 		},
 		{
 			name:           "Success POST",
-			useHTTPPost:    true,
+			method:         http.MethodPost,
 			responseStatus: http.StatusOK,
 			responseBody:   ListUsersResponse,
 			expectedUsers:  &scim.UserList{Resources: []scim.User{ExpectedUser}},
@@ -346,19 +307,12 @@ func TestAPIClient_ListUsers(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client, _ := scim.NewClient(t.Context(), scim.Params{
-				Common: scim.Common{
-					Host:         server.URL,
-					ClientID:     "test-client",
-					ClientSecret: "unreal",
-				},
-				TLS: &tls.Config{},
-			})
+			client := getBasicClient(server.URL)
 
 			filter := scim.FilterComparison{Attribute: "DisplayName",
 				Operator: scim.FilterOperatorEqual,
 				Value:    "None"}
-			users, err := client.ListUsers(t.Context(), tt.useHTTPPost, filter, nil, nil)
+			users, err := client.ListUsers(t.Context(), tt.method, filter, nil, nil)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -372,7 +326,7 @@ func TestAPIClient_ListUsers(t *testing.T) {
 	}
 }
 
-func TestAPIClient_GetGroup(t *testing.T) {
+func TestGetGroup(t *testing.T) {
 	tests := []struct {
 		name           string
 		groupID        string
@@ -419,14 +373,7 @@ func TestAPIClient_GetGroup(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client, _ := scim.NewClient(t.Context(), scim.Params{
-				Common: scim.Common{
-					Host:         server.URL,
-					ClientID:     "test-client",
-					ClientSecret: "unreal",
-				},
-				TLS: &tls.Config{},
-			})
+			client := getBasicClient(server.URL)
 
 			group, err := client.GetGroup(t.Context(), tt.groupID)
 
@@ -442,10 +389,10 @@ func TestAPIClient_GetGroup(t *testing.T) {
 	}
 }
 
-func TestAPIClient_ListGroups(t *testing.T) {
+func TestListGroups(t *testing.T) {
 	tests := []struct {
 		name           string
-		useHTTPPost    bool
+		method         string
 		responseStatus int
 		responseBody   string
 		expectedGroups *scim.GroupList
@@ -461,7 +408,7 @@ func TestAPIClient_ListGroups(t *testing.T) {
 		},
 		{
 			name:           "Success POST",
-			useHTTPPost:    true,
+			method:         http.MethodPost,
 			responseStatus: http.StatusOK,
 			responseBody:   ListGroupsResponse,
 			expectedGroups: &scim.GroupList{Resources: []scim.Group{ExpectedGroup}},
@@ -486,19 +433,12 @@ func TestAPIClient_ListGroups(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client, _ := scim.NewClient(t.Context(), scim.Params{
-				Common: scim.Common{
-					Host:         server.URL,
-					ClientID:     "test-client",
-					ClientSecret: "unreal",
-				},
-				TLS: &tls.Config{},
-			})
+			client := getBasicClient(server.URL)
 
 			filter := scim.FilterComparison{Attribute: "DisplayName",
 				Operator: scim.FilterOperatorEqual,
 				Value:    "KeyAdmin"}
-			groups, err := client.ListGroups(t.Context(), tt.useHTTPPost, filter, nil, nil)
+			groups, err := client.ListGroups(t.Context(), tt.method, filter, nil, nil)
 
 			if tt.expectError {
 				assert.Error(t, err)

@@ -2,9 +2,8 @@ package scim
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"os"
+	"net/http"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/samber/oops"
@@ -14,6 +13,7 @@ import (
 	configv1 "github.com/openkcm/plugin-sdk/proto/service/common/config/v1"
 
 	"github.com/openkcm/identity-management-plugins/pkg/clients/scim"
+	"github.com/openkcm/identity-management-plugins/pkg/config"
 	"github.com/openkcm/identity-management-plugins/pkg/utils/errs"
 )
 
@@ -34,23 +34,9 @@ type Plugin struct {
 	idmangv1.UnsafeIdentityManagementServiceServer
 	configv1.UnsafeConfigServer
 
-	logger        hclog.Logger
-	scimClient    *scim.Client
-	requestParams RequestParams
-}
-
-type RequestParams struct {
-	GroupAttribute *string `json:"groupattribute"`
-	UserAttribute  *string `json:"userattribute"`
-}
-
-type Config struct {
-	ConnectCfg    scim.APIParams `json:"connectcfg"`
-	RequestParams RequestParams  `json:"requestparams"`
-}
-
-type Required struct {
-	CredentialFile string `yaml:"credentialfile"` //nolint:tagliatelle
+	logger     hclog.Logger
+	scimClient *scim.Client
+	config     *config.Config
 }
 
 var (
@@ -72,21 +58,15 @@ func (p *Plugin) Configure(
 ) (*configv1.ConfigureResponse, error) {
 	p.logger.Info("Configuring plugin")
 
-	var cfgReq Required
+	p.config = &config.Config{}
 
-	err := yaml.Unmarshal([]byte(req.GetYamlConfiguration()), &cfgReq)
+	err := yaml.Unmarshal([]byte(req.GetYamlConfiguration()), p.config)
 	if err != nil {
 		return nil, oops.In("Identity management Plugin").
 			Wrapf(err, "Failed to get yaml Configuration")
 	}
 
-	cfg, err := buildConfigFromRequest(&cfgReq)
-	if err != nil {
-		return nil, oops.In("Identity management Plugin").
-			Wrapf(err, "Failed to build config")
-	}
-
-	client, err := scim.NewClientFromAPI(ctx, cfg.ConnectCfg)
+	client, err := scim.NewClient(p.config, p.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +80,7 @@ func (p *Plugin) GetAllGroups(
 	ctx context.Context,
 	request *idmangv1.GetAllGroupsRequest,
 ) (*idmangv1.GetAllGroupsResponse, error) {
-	groups, err := p.scimClient.ListGroups(ctx, false, scim.NullFilterExpression{}, nil, nil)
+	groups, err := p.scimClient.ListGroups(ctx, http.MethodGet, scim.NullFilterExpression{}, nil, nil)
 	if err != nil {
 		return nil, errs.Wrap(ErrGetGroupsForUser, err)
 	}
@@ -122,14 +102,14 @@ func (p *Plugin) GetUsersForGroup(
 		return nil, ErrNoScimClient
 	}
 
-	filter := getFilter(defaultGroupsFilterAttribute, request.GetGroupId(),
-		p.requestParams.GroupAttribute)
+	attr := p.config.Params.GroupAttribute
+	filter := getFilter(defaultGroupsFilterAttribute, request.GetGroupId(), attr)
 
 	if (filter == scim.NullFilterExpression{}) {
 		return nil, errs.Wrap(ErrGetUsersForGroup, ErrNoID)
 	}
 
-	users, err := p.scimClient.ListUsers(ctx, true, filter, nil, nil)
+	users, err := p.scimClient.ListUsers(ctx, http.MethodPost, filter, nil, nil)
 	if err != nil {
 		return nil, errs.Wrap(ErrGetUsersForGroup, err)
 	}
@@ -151,14 +131,14 @@ func (p *Plugin) GetGroupsForUser(
 		return nil, ErrNoScimClient
 	}
 
-	filter := getFilter(defaultUsersFilterAttribute, request.GetUserId(),
-		p.requestParams.UserAttribute)
+	attr := p.config.Params.UserAttribute
+	filter := getFilter(defaultUsersFilterAttribute, request.GetUserId(), attr)
 
 	if (filter == scim.NullFilterExpression{}) {
 		return nil, errs.Wrap(ErrGetGroupsForUser, ErrNoID)
 	}
 
-	groups, err := p.scimClient.ListGroups(ctx, true, filter, nil, nil)
+	groups, err := p.scimClient.ListGroups(ctx, http.MethodPost, filter, nil, nil)
 	if err != nil {
 		return nil, errs.Wrap(ErrGetGroupsForUser, err)
 	}
@@ -170,22 +150,6 @@ func (p *Plugin) GetGroupsForUser(
 	}
 
 	return &idmangv1.GetGroupsForUserResponse{Groups: responseGroups}, nil
-}
-
-func buildConfigFromRequest(cfgReq *Required) (Config, error) {
-	data, err := os.ReadFile(cfgReq.CredentialFile)
-	if err != nil {
-		return Config{}, err
-	}
-
-	var cfg Config
-
-	err = json.Unmarshal(data, &cfg)
-	if err != nil {
-		return Config{}, err
-	}
-
-	return cfg, nil
 }
 
 func getFilter(defaultAttribute, value string, setAttribute *string) scim.FilterExpression {

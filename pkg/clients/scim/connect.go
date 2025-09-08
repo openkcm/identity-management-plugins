@@ -2,16 +2,19 @@ package scim
 
 import (
 	"context"
-	"crypto/tls"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 
-	errs "github.com/openkcm/identity-management-plugins/pkg/utils/errs"
+	"github.com/hashicorp/go-hclog"
+	"github.com/openkcm/common-sdk/pkg/commoncfg"
+	"github.com/openkcm/common-sdk/pkg/pointers"
+
+	"github.com/openkcm/identity-management-plugins/pkg/config"
+	"github.com/openkcm/identity-management-plugins/pkg/utils/errs"
 	"github.com/openkcm/identity-management-plugins/pkg/utils/httpclient"
-	"github.com/openkcm/identity-management-plugins/pkg/utils/tlsconfig"
 )
 
 const (
@@ -22,107 +25,85 @@ const (
 	BasePathGroups = "/Groups"
 	BasePathUsers  = "/Users"
 	PostSearchPath = ".search"
+
+	HeaderAuthorization = "Authorization"
 )
 
 var (
-	ErrGetUser         = errors.New("error getting SCIM user")
-	ErrListUsers       = errors.New("error listing SCIM users")
-	ErrGetGroup        = errors.New("error getting SCIM group")
-	ErrListGroups      = errors.New("error listing SCIM groups")
-	ErrClientIDMissing = errors.New("client ID is required")
-	ErrAuthParams      = errors.New("must provide client secret or TLS config")
+	ErrAuthNotImplemented       = errors.New("API Auth not implemented")
+	ErrGetUser                  = errors.New("error getting SCIM user")
+	ErrListUsers                = errors.New("error listing SCIM users")
+	ErrGetGroup                 = errors.New("error getting SCIM group")
+	ErrListGroups               = errors.New("error listing SCIM groups")
+	ErrHttpCreation             = errors.New("failed to create the http client")
+	ErrClientID                 = errors.New("failed to load the client id")
+	ErrClientSecret             = errors.New("failed to load the client secret")
+	ErrParsingClientCertificate = errors.New("failed to parse client certificate x509 pair")
 )
 
-type Common struct {
-	Host         string `json:"host"`
-	ClientID     string `json:"clientid"`
-	ClientSecret string `json:"clientsecret"`
-}
-
-type TLSParams struct {
-	Cert string `json:"cert"`
-	Key  string `json:"key"`
-}
-
-type APIParams struct {
-	Common
-
-	TLS *TLSParams `json:"tlsconfig"`
-}
-
-type Params struct {
-	Common
-
-	TLS *tls.Config
-}
-
 type Client struct {
-	httpClient http.Client
-	Params     Common
+	logger     hclog.Logger
+	httpClient *http.Client
+	host       string
+
+	basicAuth *basicAuth
+}
+type basicAuth struct {
+	clientID     string
+	clientSecret string
 }
 
-func NewClient(ctx context.Context, params Params) (*Client, error) {
-	if params.ClientID == "" {
-		return nil, ErrClientIDMissing
-	}
-
-	if params.TLS != nil {
-		return &Client{
-			httpClient: http.Client{
-				Transport: &http.Transport{
-					TLSClientConfig: params.TLS,
-				},
-			},
-			Params: params.Common,
-		}, nil
-	} else if params.ClientSecret != "" {
-		return &Client{
-			Params: params.Common,
-		}, nil
-	} else {
-		return nil, ErrAuthParams
-	}
-}
-
-func NewClientFromAPI(ctx context.Context, params APIParams) (*Client, error) {
-	if params.ClientID == "" {
-		return nil, ErrClientIDMissing
-	}
-
-	if params.TLS != nil && params.TLS.Key != "" && params.TLS.Cert != "" {
-		tlsConfig, err := tlsconfig.NewTLSConfig(
-			tlsconfig.WithCertAndKey(params.TLS.Cert, params.TLS.Key))
+func NewClient(cfg *config.Config, logger hclog.Logger) (*Client, error) {
+	switch cfg.Auth.Type {
+	case commoncfg.BasicSecretType:
+		clientId, err := commoncfg.LoadValueFromSourceRef(cfg.Auth.Basic.Username)
 		if err != nil {
-			return nil, err
+			return nil, ErrClientID
+		}
+
+		clientSecret, err := commoncfg.LoadValueFromSourceRef(cfg.Auth.Basic.Password)
+		if err != nil {
+			return nil, ErrClientSecret
 		}
 
 		return &Client{
-			httpClient: http.Client{
+			logger:     logger,
+			httpClient: &http.Client{},
+			host:       cfg.Host,
+			basicAuth: &basicAuth{
+				clientID:     string(clientId),
+				clientSecret: string(clientSecret),
+			},
+		}, nil
+	case commoncfg.MTLSSecretType:
+		mtls, err := commoncfg.LoadMTLSConfig(&cfg.Auth.MTLS)
+		if err != nil {
+			return nil, errs.Wrap(ErrParsingClientCertificate, err)
+		}
+
+		return &Client{
+			logger: logger,
+			httpClient: &http.Client{
 				Transport: &http.Transport{
-					TLSClientConfig: tlsConfig,
+					TLSClientConfig: mtls,
 				},
 			},
-			Params: params.Common,
+			host: cfg.Host,
 		}, nil
-	} else if params.ClientSecret != "" {
-		return &Client{
-			Params: params.Common,
-		}, nil
-	} else {
-		return nil, ErrAuthParams
+	default:
+		return nil, ErrAuthNotImplemented
 	}
 }
 
 // GetUser retrieves a SCIM user by its ID.
 func (c *Client) GetUser(ctx context.Context, id string) (*User, error) {
-	resourcePath := BasePathUsers + "/" + id
-	resp, err := c.makeAPIRequest(ctx, http.MethodGet, resourcePath, nil, nil)
+	resp, err := c.baseCreateAndExecuteHTTPRequest(ctx, http.MethodGet, BasePathUsers+"/"+id, nil, nil)
 
 	if resp != nil {
 		defer func() {
 			err := resp.Body.Close()
 			if err != nil {
-				slog.ErrorContext(ctx, "failed to close GetUser response body", "error", err)
+				c.logger.Error("failed to close GetUser response body", "error", err)
 			}
 		}()
 	}
@@ -144,24 +125,22 @@ func (c *Client) GetUser(ctx context.Context, id string) (*User, error) {
 // The useHTTPPost parameter determines whether to use POST method + /.search path for the request.
 func (c *Client) ListUsers(
 	ctx context.Context,
-	useHTTPPost bool,
+	method string,
 	filter FilterExpression,
 	cursor *string,
 	count *int,
 ) (*UserList, error) {
-	resp, err := c.makeListRequest(ctx, useHTTPPost, BasePathUsers, filter, cursor, count)
-	if resp != nil {
-		defer func() {
-			err := resp.Body.Close()
-			if err != nil {
-				slog.ErrorContext(ctx, "failed to close ListUsers response body", "error", err)
-			}
-		}()
-	}
-
+	resp, err := c.createAndExecuteHTTPRequest(ctx, method, BasePathUsers, filter, cursor, count)
 	if err != nil {
 		return nil, errs.Wrap(ErrListUsers, err)
 	}
+
+	defer func() {
+		err := resp.Body.Close()
+		if err != nil {
+			c.logger.Error("failed to close ListUsers response body", "error", err)
+		}
+	}()
 
 	users, err := httpclient.DecodeResponse[UserList](ctx, "SCIM", resp, http.StatusOK)
 	if err != nil {
@@ -173,14 +152,13 @@ func (c *Client) ListUsers(
 
 // GetGroup retrieves a SCIM group by its ID.
 func (c *Client) GetGroup(ctx context.Context, id string) (*Group, error) {
-	resourcePath := BasePathGroups + "/" + id
-	resp, err := c.makeAPIRequest(ctx, http.MethodGet, resourcePath, nil, nil)
+	resp, err := c.baseCreateAndExecuteHTTPRequest(ctx, http.MethodGet, BasePathGroups+"/"+id, nil, nil)
 
 	if resp != nil {
 		defer func() {
 			err := resp.Body.Close()
 			if err != nil {
-				slog.ErrorContext(ctx, "failed to close GetGroup response body", "error", err)
+				c.logger.Error("failed to close GetGroup response body", "error", err)
 			}
 		}()
 	}
@@ -202,18 +180,18 @@ func (c *Client) GetGroup(ctx context.Context, id string) (*Group, error) {
 // The useHTTPPost parameter determines whether to use POST method + /.search path for the request.
 func (c *Client) ListGroups(
 	ctx context.Context,
-	useHTTPPost bool,
+	method string,
 	filter FilterExpression,
 	cursor *string,
 	count *int,
 ) (*GroupList, error) {
-	resp, err := c.makeListRequest(ctx, useHTTPPost, BasePathGroups, filter, cursor, count)
+	resp, err := c.createAndExecuteHTTPRequest(ctx, method, BasePathGroups, filter, cursor, count)
 
 	if resp != nil {
 		defer func() {
 			err := resp.Body.Close()
 			if err != nil {
-				slog.ErrorContext(ctx, "failed to close ListGroups response body", "error", err)
+				c.logger.Error("failed to close ListGroups response body", "error", err)
 			}
 		}()
 	}
@@ -230,43 +208,38 @@ func (c *Client) ListGroups(
 	return groups, nil
 }
 
-func (c *Client) setAuth(req *http.Request) {
-	if c.Params.ClientSecret != "" {
-		req.SetBasicAuth(c.Params.ClientID, c.Params.ClientSecret)
-	} else {
-		// For client certificate auth, we only need to add the client_id to the query string
-		query := req.URL.Query()
-		query.Add("client_id", c.Params.ClientID)
-		req.URL.RawQuery = query.Encode()
+func (c *Client) doRequest(req *http.Request) (*http.Response, error) {
+	if req.Method == http.MethodPost || req.Method == http.MethodPut || req.Method == http.MethodPatch {
+		req.Header.Set("Content-Type", ApplicationSCIMJson)
 	}
+
+	req.Header.Set("Accept", ApplicationSCIMJson)
+
+	if c.basicAuth != nil {
+		basicCreds := []byte(c.basicAuth.clientID + ":" + c.basicAuth.clientSecret)
+		req.Header.Set(HeaderAuthorization, "Basic "+base64.RawStdEncoding.EncodeToString(basicCreds))
+	}
+
+	return c.httpClient.Do(req)
 }
 
-func (c *Client) makeAPIRequest(
+func (c *Client) baseCreateAndExecuteHTTPRequest(
 	ctx context.Context,
 	method string,
 	resourcePath string,
 	queryString *string,
-	body *io.Reader,
+	body io.Reader,
 ) (*http.Response, error) {
-	var requestBody io.Reader
-	if body != nil {
-		requestBody = *body
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, c.Params.Host+resourcePath, requestBody)
+	req, err := http.NewRequestWithContext(ctx, method, c.host+resourcePath, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-
-	setSCIMHeaders(req)
 
 	if queryString != nil {
 		req.URL.RawQuery = *queryString
 	}
 
-	c.setAuth(req)
-
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.doRequest(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
@@ -274,31 +247,38 @@ func (c *Client) makeAPIRequest(
 	return resp, nil
 }
 
-// makeListRequest creates a request to list SCIM resources (users or groups).
+// createAndExecuteHTTPRequest create a request to list SCIM resources (users or groups).
 // It uses either GET or POST method based on the useHTTPPost parameter.
 // It builds the request with the provided filter, cursor, and count parameters.
 // For GET method, parameters are added to the query string.
 // For POST method, parameters are included in the request body.
-func (c *Client) makeListRequest(
+func (c *Client) createAndExecuteHTTPRequest(
 	ctx context.Context,
-	useHTTPPost bool,
+	method string,
 	basePath string,
 	filter FilterExpression,
 	cursor *string,
 	count *int,
 ) (*http.Response, error) {
 	resourcePath := basePath + "/"
-	method := http.MethodGet
 
-	if useHTTPPost {
+	var (
+		body        io.Reader
+		queryString string
+	)
+
+	if method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch {
 		resourcePath += PostSearchPath
-		method = http.MethodPost
+
+		var err error
+
+		body, err = buildBodyFromParams(filter, count, cursor)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build request: %w", err)
+		}
+	} else {
+		queryString = buildQueryStringFromParams(filter, cursor, count)
 	}
 
-	body, queryString, err := buildQueryStringAndBody(useHTTPPost, filter, cursor, count)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build request: %w", err)
-	}
-
-	return c.makeAPIRequest(ctx, method, resourcePath, queryString, body)
+	return c.baseCreateAndExecuteHTTPRequest(ctx, method, resourcePath, pointers.String(queryString), body)
 }
