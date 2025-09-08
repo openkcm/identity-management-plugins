@@ -5,26 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"net/http"
 	"net/url"
 	"strconv"
 
-	errs "github.com/openkcm/identity-management-plugins/pkg/utils/errs"
-	"github.com/openkcm/identity-management-plugins/pkg/utils/ptr"
+	"github.com/openkcm/common-sdk/pkg/pointers"
+
+	"github.com/openkcm/identity-management-plugins/pkg/utils/errs"
 )
 
 var (
 	ErrNoFilter     = errors.New("filter not provided")
 	ErrMarshallFail = errors.New("failed to marshal search request")
 )
-
-func setSCIMHeaders(req *http.Request) {
-	if req.Method == http.MethodPost || req.Method == http.MethodPut || req.Method == http.MethodPatch {
-		req.Header.Set("Content-Type", ApplicationSCIMJson)
-	}
-
-	req.Header.Set("Accept", ApplicationSCIMJson)
-}
 
 func buildBodyFromParams(filter FilterExpression, count *int, cursor *string) (io.Reader, error) {
 	searchRequest := SearchRequest{
@@ -37,7 +29,7 @@ func buildBodyFromParams(filter FilterExpression, count *int, cursor *string) (i
 		return nil, ErrNoFilter
 	}
 
-	searchRequest.Filter = ptr.PointTo((filter).ToString())
+	searchRequest.Filter = pointers.To(filter.ToString())
 
 	jsonBody, err := json.Marshal(searchRequest)
 	if err != nil {
@@ -62,29 +54,4 @@ func buildQueryStringFromParams(filter FilterExpression, cursor *string, count *
 	}
 
 	return query.Encode()
-}
-
-func buildQueryStringAndBody(
-	useHTTPPost bool,
-	filter FilterExpression,
-	cursor *string,
-	count *int,
-) (*io.Reader, *string, error) {
-	var (
-		body        io.Reader
-		queryString string
-		err         error
-	)
-
-	if useHTTPPost {
-		body, err = buildBodyFromParams(filter, count, cursor)
-	} else {
-		queryString = buildQueryStringFromParams(filter, cursor, count)
-	}
-
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return &body, &queryString, nil
 }

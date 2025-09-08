@@ -3,15 +3,19 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
 	"log/slog"
+	"net/http"
 	"os"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/magodo/slog2hclog"
+	"github.com/openkcm/common-sdk/pkg/commoncfg"
+
 	"github.com/openkcm/identity-management-plugins/pkg/clients/scim"
-	"github.com/openkcm/identity-management-plugins/pkg/utils/tlsconfig"
+	"github.com/openkcm/identity-management-plugins/pkg/config"
 )
 
 const usage = `Script to test SCIM API calls.
@@ -31,6 +35,13 @@ Options:
 `
 
 const defaultCount = 100
+
+func getLogger() hclog.Logger {
+	logLevelPlugin := new(slog.LevelVar)
+	logLevelPlugin.Set(slog.LevelError)
+
+	return slog2hclog.New(slog.Default(), logLevelPlugin)
+}
 
 func main() {
 	log.SetOutput(os.Stdout)
@@ -63,44 +74,71 @@ func main() {
 	}
 
 	var (
-		tlsConfig *tls.Config
-		err       error
+		err error
 	)
 
 	ctx := context.Background()
 
+	var cfg *config.Config
 	if certPath != "" && keyPath != "" {
-		tlsConfig, err = tlsconfig.NewTLSConfig(tlsconfig.WithCertAndKey(certPath, keyPath))
-		if err != nil {
-			fmt.Println("Error creating TLS config:", err.Error())
-			os.Exit(1)
+		cfg = &config.Config{
+			Host: host,
+			Auth: commoncfg.SecretRef{
+				Type: commoncfg.MTLSSecretType,
+				MTLS: commoncfg.MTLS{
+					Cert: commoncfg.SourceRef{
+						Source: commoncfg.FileSourceValue,
+						File: commoncfg.CredentialFile{
+							Path:   certPath,
+							Format: commoncfg.BinaryFileFormat,
+						}},
+					CertKey: commoncfg.SourceRef{
+						Source: commoncfg.FileSourceValue,
+						File: commoncfg.CredentialFile{
+							Path:   keyPath,
+							Format: commoncfg.BinaryFileFormat,
+						},
+					},
+				},
+			},
+		}
+	} else {
+		cfg = &config.Config{
+			Host: host,
+			Auth: commoncfg.SecretRef{
+				Type: commoncfg.BasicSecretType,
+				Basic: commoncfg.BasicAuth{
+					Username: commoncfg.SourceRef{
+						Source: commoncfg.EmbeddedSourceValue,
+						Value:  clientID},
+					Password: commoncfg.SourceRef{
+						Source: commoncfg.EmbeddedSourceValue,
+						Value:  clientSecret},
+				},
+			},
 		}
 	}
 
-	client, err := scim.NewClient(ctx,
-		scim.Params{
-			Common: scim.Common{
-				Host:         host,
-				ClientID:     clientID,
-				ClientSecret: clientSecret,
-			},
-			TLS: tlsConfig,
-		},
-	)
+	client, err := scim.NewClient(cfg, getLogger())
 	if err != nil {
 		fmt.Println("Error creating SCIM client:", err.Error())
 		os.Exit(1)
+	}
+
+	method := http.MethodGet
+	if useHTTPPost {
+		method = http.MethodPost
 	}
 
 	switch action {
 	case "GetUser":
 		getUser(ctx, client, id)
 	case "ListUsers":
-		listUsers(ctx, client, useHTTPPost, cursor, count, displayName)
+		listUsers(ctx, client, method, cursor, count, displayName)
 	case "GetGroup":
 		getGroup(ctx, client, id)
 	case "ListGroups":
-		listGroups(ctx, client, useHTTPPost, cursor, count, displayName)
+		listGroups(ctx, client, method, cursor, count, displayName)
 	default:
 		fmt.Println("Invalid action. Supported actions are: GetUser, ListUsers, GetGroup, ListGroups")
 		os.Exit(1)
@@ -119,7 +157,7 @@ func getUser(ctx context.Context, client *scim.Client, id string) {
 
 func listUsers(ctx context.Context,
 	client *scim.Client,
-	useHTTPPost bool,
+	method string,
 	cursor string,
 	count int,
 	displayName string,
@@ -135,7 +173,7 @@ func listUsers(ctx context.Context,
 		filter = scim.NullFilterExpression{}
 	}
 
-	users, err := client.ListUsers(ctx, useHTTPPost, filter, &cursor, &count)
+	users, err := client.ListUsers(ctx, method, filter, &cursor, &count)
 	if err != nil {
 		fmt.Println("Error listing users:", err.Error())
 		os.Exit(1)
@@ -166,7 +204,7 @@ func getGroup(ctx context.Context, client *scim.Client, id string) {
 func listGroups(
 	ctx context.Context,
 	client *scim.Client,
-	useHTTPPost bool,
+	method string,
 	cursor string,
 	count int,
 	displayName string,
@@ -182,7 +220,7 @@ func listGroups(
 		filter = scim.NullFilterExpression{}
 	}
 
-	groups, err := client.ListGroups(ctx, useHTTPPost, filter, &cursor, &count)
+	groups, err := client.ListGroups(ctx, method, filter, &cursor, &count)
 	if err != nil {
 		fmt.Println("Error listing groups:", err.Error())
 		os.Exit(1)
