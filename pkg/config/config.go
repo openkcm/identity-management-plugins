@@ -8,8 +8,7 @@ type Params struct {
 }
 
 type Config struct {
-	Host   string `yaml:"host"`
-	Params Params `yaml:"params"`
-
-	Auth commoncfg.SecretRef `yaml:"auth"`
+	Host   commoncfg.SourceRef `yaml:"host"`
+	Auth   commoncfg.SecretRef `yaml:"auth"`
+	Params Params              `yaml:"params"`
 }
