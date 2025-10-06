@@ -150,8 +150,14 @@ func (c *Client) ListUsers(
 }
 
 // GetGroup retrieves a SCIM group by its ID.
-func (c *Client) GetGroup(ctx context.Context, id string) (*Group, error) {
-	resp, err := c.baseCreateAndExecuteHTTPRequest(ctx, http.MethodGet, BasePathGroups+"/"+id, nil, nil)
+func (c *Client) GetGroup(ctx context.Context, id string, groupMemberAttribute string) (*Group, error) {
+	var queryString *string
+
+	if groupMemberAttribute != "" {
+		queryString = pointers.String("attributes=" + groupMemberAttribute)
+	}
+
+	resp, err := c.baseCreateAndExecuteHTTPRequest(ctx, http.MethodGet, BasePathGroups+"/"+id, queryString, nil)
 
 	if resp != nil {
 		defer func() {
