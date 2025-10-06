@@ -3,7 +3,6 @@ package scim
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -61,13 +60,6 @@ func NewClient(hostRef commoncfg.SourceRef, authRef commoncfg.SecretRef,
 		return nil, errs.Wrap(ErrClientHost, err)
 	}
 
-	var host string
-
-	err = json.Unmarshal(hostBytes, &host)
-	if err != nil {
-		return nil, errs.Wrap(ErrClientHost, err)
-	}
-
 	switch authRef.Type {
 	case commoncfg.BasicSecretType:
 		clientId, err := commoncfg.LoadValueFromSourceRef(authRef.Basic.Username)
@@ -83,7 +75,7 @@ func NewClient(hostRef commoncfg.SourceRef, authRef commoncfg.SecretRef,
 		return &Client{
 			logger:     logger,
 			httpClient: &http.Client{},
-			host:       host,
+			host:       string(hostBytes),
 			basicAuth: &basicAuth{
 				clientID:     string(clientId),
 				clientSecret: string(clientSecret),
@@ -102,7 +94,7 @@ func NewClient(hostRef commoncfg.SourceRef, authRef commoncfg.SecretRef,
 					TLSClientConfig: mtls,
 				},
 			},
-			host: host,
+			host: string(hostBytes),
 		}, nil
 	default:
 		return nil, ErrAuthNotImplemented
@@ -165,8 +157,14 @@ func (c *Client) ListUsers(
 }
 
 // GetGroup retrieves a SCIM group by its ID.
-func (c *Client) GetGroup(ctx context.Context, id string) (*Group, error) {
-	resp, err := c.baseCreateAndExecuteHTTPRequest(ctx, http.MethodGet, BasePathGroups+"/"+id, nil, nil)
+func (c *Client) GetGroup(ctx context.Context, id string, groupMemberAttribute string) (*Group, error) {
+	var queryString *string
+
+	if groupMemberAttribute != "" {
+		queryString = pointers.String("attributes=" + groupMemberAttribute)
+	}
+
+	resp, err := c.baseCreateAndExecuteHTTPRequest(ctx, http.MethodGet, BasePathGroups+"/"+id, queryString, nil)
 
 	if resp != nil {
 		defer func() {

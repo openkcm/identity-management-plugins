@@ -106,7 +106,7 @@ func getLogger() hclog.Logger {
 func getHostRef(host string) commoncfg.SourceRef {
 	return commoncfg.SourceRef{
 		Source: commoncfg.EmbeddedSourceValue,
-		Value:  "\"" + host + "\"",
+		Value:  host,
 	}
 }
 
@@ -376,7 +376,7 @@ func TestGetGroup(t *testing.T) {
 
 			client := getBasicClient(server.URL)
 
-			group, err := client.GetGroup(t.Context(), tt.groupID)
+			group, err := client.GetGroup(t.Context(), tt.groupID, "members")
 
 			if tt.expectError {
 				assert.Error(t, err)

@@ -38,7 +38,7 @@ func (p *Plugin) SetTestClient(t *testing.T, host string, groupFilterAttribute, 
 
 	hostRef := commoncfg.SourceRef{
 		Source: commoncfg.EmbeddedSourceValue,
-		Value:  "\"" + host + "\"",
+		Value:  host,
 	}
 
 	client, err := scim.NewClient(hostRef, secretRef, getLogger())
@@ -46,7 +46,8 @@ func (p *Plugin) SetTestClient(t *testing.T, host string, groupFilterAttribute, 
 
 	p.scimClient = client
 	p.params = Params{
-		GroupAttribute: groupFilterAttribute,
-		UserAttribute:  userFilterAttribute,
+		GroupAttribute:          groupFilterAttribute,
+		UserAttribute:           userFilterAttribute,
+		AllowSearchUsersByGroup: true,
 	}
 }
