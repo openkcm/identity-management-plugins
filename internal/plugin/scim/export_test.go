@@ -23,27 +23,26 @@ func getLogger() hclog.Logger {
 func (p *Plugin) SetTestClient(t *testing.T, host string, groupFilterAttribute, userFilterAttribute *string) {
 	t.Helper()
 
-	config := &config.Config{
-		Host: host,
-		Auth: commoncfg.SecretRef{
-			Type: commoncfg.BasicSecretType,
-			Basic: commoncfg.BasicAuth{
-				Username: commoncfg.SourceRef{
-					Source: commoncfg.EmbeddedSourceValue,
-					Value:  ""},
-				Password: commoncfg.SourceRef{
-					Source: commoncfg.EmbeddedSourceValue,
-					Value:  ""},
+	secretRef := commoncfg.SecretRef{
+		Type: commoncfg.BasicSecretType,
+		Basic: commoncfg.BasicAuth{
+			Username: commoncfg.SourceRef{
+				Source: commoncfg.EmbeddedSourceValue,
+				Value:  "",
+			},
+			Password: commoncfg.SourceRef{
+				Source: commoncfg.EmbeddedSourceValue,
+				Value:  "",
 			},
 		},
-		Params: config.Params{
-			GroupAttribute: groupFilterAttribute,
-			UserAttribute:  userFilterAttribute,
-		},
 	}
-	client, err := scim.NewClient(config, getLogger())
+
+	client, err := scim.NewClient(host, secretRef, getLogger())
 	assert.NoError(t, err)
 
 	p.scimClient = client
-	p.config = config
+	p.params = config.Params{
+		GroupAttribute: groupFilterAttribute,
+		UserAttribute:  userFilterAttribute,
+	}
 }

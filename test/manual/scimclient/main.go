@@ -15,7 +15,6 @@ import (
 	"github.com/openkcm/common-sdk/pkg/commoncfg"
 
 	"github.com/openkcm/identity-management-plugins/pkg/clients/scim"
-	"github.com/openkcm/identity-management-plugins/pkg/config"
 )
 
 const usage = `Script to test SCIM API calls.
@@ -79,47 +78,44 @@ func main() {
 
 	ctx := context.Background()
 
-	var cfg *config.Config
+	var secretRef commoncfg.SecretRef
 	if certPath != "" && keyPath != "" {
-		cfg = &config.Config{
-			Host: host,
-			Auth: commoncfg.SecretRef{
-				Type: commoncfg.MTLSSecretType,
-				MTLS: commoncfg.MTLS{
-					Cert: commoncfg.SourceRef{
-						Source: commoncfg.FileSourceValue,
-						File: commoncfg.CredentialFile{
-							Path:   certPath,
-							Format: commoncfg.BinaryFileFormat,
-						}},
-					CertKey: commoncfg.SourceRef{
-						Source: commoncfg.FileSourceValue,
-						File: commoncfg.CredentialFile{
-							Path:   keyPath,
-							Format: commoncfg.BinaryFileFormat,
-						},
+		secretRef = commoncfg.SecretRef{
+			Type: commoncfg.MTLSSecretType,
+			MTLS: commoncfg.MTLS{
+				Cert: commoncfg.SourceRef{
+					Source: commoncfg.FileSourceValue,
+					File: commoncfg.CredentialFile{
+						Path:   certPath,
+						Format: commoncfg.BinaryFileFormat,
+					},
+				},
+				CertKey: commoncfg.SourceRef{
+					Source: commoncfg.FileSourceValue,
+					File: commoncfg.CredentialFile{
+						Path:   keyPath,
+						Format: commoncfg.BinaryFileFormat,
 					},
 				},
 			},
 		}
 	} else {
-		cfg = &config.Config{
-			Host: host,
-			Auth: commoncfg.SecretRef{
-				Type: commoncfg.BasicSecretType,
-				Basic: commoncfg.BasicAuth{
-					Username: commoncfg.SourceRef{
-						Source: commoncfg.EmbeddedSourceValue,
-						Value:  clientID},
-					Password: commoncfg.SourceRef{
-						Source: commoncfg.EmbeddedSourceValue,
-						Value:  clientSecret},
+		secretRef = commoncfg.SecretRef{
+			Type: commoncfg.BasicSecretType,
+			Basic: commoncfg.BasicAuth{
+				Username: commoncfg.SourceRef{
+					Source: commoncfg.EmbeddedSourceValue,
+					Value:  clientID,
+				},
+				Password: commoncfg.SourceRef{
+					Source: commoncfg.EmbeddedSourceValue,
+					Value:  clientSecret,
 				},
 			},
 		}
 	}
 
-	client, err := scim.NewClient(cfg, getLogger())
+	client, err := scim.NewClient(host, secretRef, getLogger())
 	if err != nil {
 		fmt.Println("Error creating SCIM client:", err.Error())
 		os.Exit(1)

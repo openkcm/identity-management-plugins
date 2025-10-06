@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/openkcm/identity-management-plugins/pkg/clients/scim"
-	"github.com/openkcm/identity-management-plugins/pkg/config"
 )
 
 const (
@@ -106,9 +105,45 @@ func getLogger() hclog.Logger {
 
 func getBasicClient(url string) *scim.Client {
 	client, _ := scim.NewClient(
-		&config.Config{
-			Host: url,
-			Auth: commoncfg.SecretRef{
+		url,
+		commoncfg.SecretRef{
+			Type: commoncfg.BasicSecretType,
+			Basic: commoncfg.BasicAuth{
+				Username: commoncfg.SourceRef{
+					Source: commoncfg.EmbeddedSourceValue,
+					Value:  ""},
+				Password: commoncfg.SourceRef{
+					Source: commoncfg.EmbeddedSourceValue,
+					Value:  ""},
+			},
+		}, getLogger())
+
+	return client
+}
+
+func TestNewClient(t *testing.T) {
+	exHost := "http://example.com"
+
+	tests := []struct {
+		name          string
+		host          string
+		auth          commoncfg.SecretRef
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name: "Non-supported auth",
+			host: exHost,
+			auth: commoncfg.SecretRef{
+				Type: commoncfg.OAuth2SecretType,
+			},
+			expectError:   true,
+			errorContains: "API Auth not implemented",
+		},
+		{
+			name: "Basic auth",
+			host: exHost,
+			auth: commoncfg.SecretRef{
 				Type: commoncfg.BasicSecretType,
 				Basic: commoncfg.BasicAuth{
 					Username: commoncfg.SourceRef{
@@ -119,64 +154,23 @@ func getBasicClient(url string) *scim.Client {
 						Value:  ""},
 				},
 			},
-		}, getLogger())
-
-	return client
-}
-
-func TestNewClient(t *testing.T) {
-	tests := []struct {
-		name          string
-		config        config.Config
-		expectError   bool
-		errorContains string
-	}{
-		{
-			name: "Non-supported auth",
-			config: config.Config{
-				Host: "http://example.com",
-				Auth: commoncfg.SecretRef{
-					Type: commoncfg.OAuth2SecretType,
-				},
-			},
-			expectError:   true,
-			errorContains: "API Auth not implemented",
-		},
-		{
-			name: "Basic auth",
-			config: config.Config{
-				Host: "http://example.com",
-				Auth: commoncfg.SecretRef{
-					Type: commoncfg.BasicSecretType,
-					Basic: commoncfg.BasicAuth{
-						Username: commoncfg.SourceRef{
-							Source: commoncfg.EmbeddedSourceValue,
-							Value:  ""},
-						Password: commoncfg.SourceRef{
-							Source: commoncfg.EmbeddedSourceValue,
-							Value:  ""},
-					},
-				},
-			},
 			expectError: false,
 		},
 		{
 			name: "MTLS auth with bad cert",
-			config: config.Config{
-				Host: "http://example.com",
-				Auth: commoncfg.SecretRef{
-					Type: commoncfg.MTLSSecretType,
-					MTLS: commoncfg.MTLS{
-						Cert: commoncfg.SourceRef{
-							Source: commoncfg.EmbeddedSourceValue,
-							Value:  "bad"},
-						CertKey: commoncfg.SourceRef{
-							Source: commoncfg.EmbeddedSourceValue,
-							Value:  "bad"},
-						ServerCA: commoncfg.SourceRef{
-							Source: commoncfg.EmbeddedSourceValue,
-							Value:  "bad"},
-					},
+			host: exHost,
+			auth: commoncfg.SecretRef{
+				Type: commoncfg.MTLSSecretType,
+				MTLS: commoncfg.MTLS{
+					Cert: commoncfg.SourceRef{
+						Source: commoncfg.EmbeddedSourceValue,
+						Value:  "bad"},
+					CertKey: commoncfg.SourceRef{
+						Source: commoncfg.EmbeddedSourceValue,
+						Value:  "bad"},
+					ServerCA: commoncfg.SourceRef{
+						Source: commoncfg.EmbeddedSourceValue,
+						Value:  "bad"},
 				},
 			},
 			expectError:   true,
@@ -186,7 +180,7 @@ func TestNewClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, err := scim.NewClient(&tt.config, getLogger())
+			client, err := scim.NewClient(tt.host, tt.auth, getLogger())
 
 			if tt.expectError {
 				assert.Error(t, err)

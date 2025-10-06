@@ -2,10 +2,14 @@ package scim
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/openkcm/common-sdk/pkg/commoncfg"
+	"github.com/openkcm/plugin-sdk/pkg/hclog2slog"
 	"github.com/samber/oops"
 	"gopkg.in/yaml.v3"
 
@@ -18,6 +22,7 @@ import (
 )
 
 var (
+	ErrID               = oops.In("Identity management Plugin")
 	ErrNoScimClient     = errors.New("no scim client exists")
 	ErrPluginCreation   = errors.New("failed to create plugin")
 	ErrGetGroupsForUser = errors.New("failed to get groups for user")
@@ -36,7 +41,7 @@ type Plugin struct {
 
 	logger     hclog.Logger
 	scimClient *scim.Client
-	config     *config.Config
+	params     config.Params
 }
 
 var (
@@ -49,7 +54,7 @@ func NewPlugin() *Plugin {
 }
 
 func (p *Plugin) SetLogger(logger hclog.Logger) {
-	p.logger = logger
+	slog.SetDefault(hclog2slog.New(logger))
 }
 
 func (p *Plugin) Configure(
@@ -58,15 +63,28 @@ func (p *Plugin) Configure(
 ) (*configv1.ConfigureResponse, error) {
 	p.logger.Info("Configuring plugin")
 
-	p.config = &config.Config{}
+	cfg := config.Config{}
 
-	err := yaml.Unmarshal([]byte(req.GetYamlConfiguration()), p.config)
+	err := yaml.Unmarshal([]byte(req.GetYamlConfiguration()), &cfg)
 	if err != nil {
-		return nil, oops.In("Identity management Plugin").
-			Wrapf(err, "Failed to get yaml Configuration")
+		return nil, ErrID.Wrapf(err, "Failed to get yaml Configuration")
 	}
 
-	client, err := scim.NewClient(p.config, p.logger)
+	p.params = cfg.Params
+
+	hostBytes, err := commoncfg.LoadValueFromSourceRef(cfg.Host)
+	if err != nil {
+		return nil, ErrID.Wrapf(err, "Failed loading host")
+	}
+
+	var host string
+
+	err = json.Unmarshal(hostBytes, &host)
+	if err != nil {
+		return nil, ErrID.Wrapf(err, "Failed unmarshalling connection")
+	}
+
+	client, err := scim.NewClient(host, cfg.Auth, p.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +120,7 @@ func (p *Plugin) GetUsersForGroup(
 		return nil, ErrNoScimClient
 	}
 
-	attr := p.config.Params.GroupAttribute
+	attr := p.params.GroupAttribute
 	filter := getFilter(defaultGroupsFilterAttribute, request.GetGroupId(), attr)
 
 	if (filter == scim.NullFilterExpression{}) {
@@ -131,7 +149,7 @@ func (p *Plugin) GetGroupsForUser(
 		return nil, ErrNoScimClient
 	}
 
-	attr := p.config.Params.UserAttribute
+	attr := p.params.UserAttribute
 	filter := getFilter(defaultUsersFilterAttribute, request.GetUserId(), attr)
 
 	if (filter == scim.NullFilterExpression{}) {

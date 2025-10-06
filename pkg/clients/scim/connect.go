@@ -12,7 +12,6 @@ import (
 	"github.com/openkcm/common-sdk/pkg/commoncfg"
 	"github.com/openkcm/common-sdk/pkg/pointers"
 
-	"github.com/openkcm/identity-management-plugins/pkg/config"
 	"github.com/openkcm/identity-management-plugins/pkg/utils/errs"
 	"github.com/openkcm/identity-management-plugins/pkg/utils/httpclient"
 )
@@ -53,15 +52,15 @@ type basicAuth struct {
 	clientSecret string
 }
 
-func NewClient(cfg *config.Config, logger hclog.Logger) (*Client, error) {
-	switch cfg.Auth.Type {
+func NewClient(host string, auth commoncfg.SecretRef, logger hclog.Logger) (*Client, error) {
+	switch auth.Type {
 	case commoncfg.BasicSecretType:
-		clientId, err := commoncfg.LoadValueFromSourceRef(cfg.Auth.Basic.Username)
+		clientId, err := commoncfg.LoadValueFromSourceRef(auth.Basic.Username)
 		if err != nil {
 			return nil, ErrClientID
 		}
 
-		clientSecret, err := commoncfg.LoadValueFromSourceRef(cfg.Auth.Basic.Password)
+		clientSecret, err := commoncfg.LoadValueFromSourceRef(auth.Basic.Password)
 		if err != nil {
 			return nil, ErrClientSecret
 		}
@@ -69,14 +68,14 @@ func NewClient(cfg *config.Config, logger hclog.Logger) (*Client, error) {
 		return &Client{
 			logger:     logger,
 			httpClient: &http.Client{},
-			host:       cfg.Host,
+			host:       host,
 			basicAuth: &basicAuth{
 				clientID:     string(clientId),
 				clientSecret: string(clientSecret),
 			},
 		}, nil
 	case commoncfg.MTLSSecretType:
-		mtls, err := commoncfg.LoadMTLSConfig(&cfg.Auth.MTLS)
+		mtls, err := commoncfg.LoadMTLSConfig(&auth.MTLS)
 		if err != nil {
 			return nil, errs.Wrap(ErrParsingClientCertificate, err)
 		}
@@ -88,7 +87,7 @@ func NewClient(cfg *config.Config, logger hclog.Logger) (*Client, error) {
 					TLSClientConfig: mtls,
 				},
 			},
-			host: cfg.Host,
+			host: host,
 		}, nil
 	default:
 		return nil, ErrAuthNotImplemented
