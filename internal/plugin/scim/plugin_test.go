@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/openkcm/common-sdk/pkg/pointers"
 	"github.com/stretchr/testify/assert"
 
 	idmangv1 "github.com/openkcm/plugin-sdk/proto/plugin/identity_management/v1"
@@ -53,14 +52,7 @@ const (
 		`"totalResults":0,"itemsPerPage":1,"startIndex":0}`
 )
 
-func pointTo[T any](t T) *T {
-	return &t
-}
-
-var NonExistentFieldPtr *string = pointers.To(NonExistentField)
-
-func setupTest(t *testing.T, url string,
-	groupFilterAttribute, userFilterAttribute *string) *plugin.Plugin {
+func setupTest(t *testing.T, url string, groupFilterAttribute, userFilterAttribute string) *plugin.Plugin {
 	t.Helper()
 
 	p := plugin.NewPlugin()
@@ -121,7 +113,7 @@ func TestGetAllGroups(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := setupTest(t, tt.serverUrl, nil, nil)
+			p := setupTest(t, tt.serverUrl, "", "")
 
 			responseMsg, err := p.GetAllGroups(t.Context(),
 				&idmangv1.GetAllGroupsRequest{})
@@ -169,17 +161,18 @@ func TestGetUsersForGroup(t *testing.T) {
 	tests := []struct {
 		name                 string
 		serverUrl            string
-		groupFilterAttribute *string
-		groupFilterValue     *string
+		groupFilterAttribute string
+		groupFilterValue     string
 		testNumUsers         int
 		testUserName         string
+		testUserID           string
 		testExpectedError    *error
 	}{
 		{
 			name:                 "Bad Server",
 			serverUrl:            "badurl",
-			groupFilterAttribute: pointers.To("displayName"),
-			groupFilterValue:     pointers.To("None"),
+			groupFilterAttribute: "displayName",
+			groupFilterValue:     "None",
 			testNumUsers:         0,
 			testUserName:         "",
 			testExpectedError:    &scim.ErrListUsers,
@@ -187,26 +180,27 @@ func TestGetUsersForGroup(t *testing.T) {
 		{
 			name:                 "Good request",
 			serverUrl:            server.URL,
-			groupFilterAttribute: pointers.To("displayName"),
-			groupFilterValue:     pointers.To("None"),
+			groupFilterAttribute: "displayName",
+			groupFilterValue:     "None",
 			testNumUsers:         1,
-			testUserName:         "None",
+			testUserName:         "cloud.analyst@example.com",
+			testUserID:           "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 			testExpectedError:    nil,
 		},
 		{
 			name:                 "Non-existent filter value",
 			serverUrl:            server.URL,
-			groupFilterAttribute: pointers.To("displayName"),
-			groupFilterValue:     NonExistentFieldPtr,
+			groupFilterAttribute: "displayName",
+			groupFilterValue:     "",
 			testNumUsers:         0,
 			testUserName:         "",
-			testExpectedError:    nil,
+			testExpectedError:    &plugin.ErrNoID,
 		},
 		{
 			name:                 "Non-existent filter attribute",
 			serverUrl:            server.URL,
-			groupFilterAttribute: NonExistentFieldPtr,
-			groupFilterValue:     pointers.To("None"),
+			groupFilterAttribute: NonExistentField,
+			groupFilterValue:     "None",
 			testNumUsers:         0,
 			testUserName:         "",
 			testExpectedError:    nil,
@@ -215,15 +209,14 @@ func TestGetUsersForGroup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := setupTest(t, tt.serverUrl, tt.groupFilterAttribute, nil)
+			p := setupTest(t, tt.serverUrl, tt.groupFilterAttribute, "")
 
 			var request = idmangv1.GetUsersForGroupRequest{}
-			if tt.groupFilterValue != nil {
-				request.GroupId = *tt.groupFilterValue
+			if tt.groupFilterValue != "" {
+				request.GroupId = tt.groupFilterValue
 			}
 
 			responseMsg, err := p.GetUsersForGroup(t.Context(), &request)
-
 			if tt.testExpectedError == nil {
 				assert.NoError(t, err)
 				assert.Len(t, responseMsg.GetUsers(), tt.testNumUsers)
@@ -233,6 +226,7 @@ func TestGetUsersForGroup(t *testing.T) {
 						t,
 						&idmangv1.GetUsersForGroupResponse{
 							Users: []*idmangv1.User{{
+								Id:   tt.testUserID,
 								Name: tt.testUserName},
 							},
 						},
@@ -268,8 +262,8 @@ func TestGetGroupsForUser(t *testing.T) {
 	tests := []struct {
 		name                string
 		serverUrl           string
-		userFilterAttribute *string
-		userFilterValue     *string
+		userFilterAttribute string
+		userFilterValue     string
 		testNumGroups       int
 		testGroupName       string
 		testExpectedError   *error
@@ -277,8 +271,8 @@ func TestGetGroupsForUser(t *testing.T) {
 		{
 			name:                "Bad Server",
 			serverUrl:           "badurl",
-			userFilterAttribute: pointTo("displayName"),
-			userFilterValue:     pointTo("None"),
+			userFilterAttribute: "displayName",
+			userFilterValue:     "None",
 			testNumGroups:       0,
 			testGroupName:       "",
 			testExpectedError:   &scim.ErrListGroups,
@@ -286,8 +280,8 @@ func TestGetGroupsForUser(t *testing.T) {
 		{
 			name:                "Good request",
 			serverUrl:           server.URL,
-			userFilterAttribute: pointers.To("displayName"),
-			userFilterValue:     pointers.To("None"),
+			userFilterAttribute: "displayName",
+			userFilterValue:     "None",
 			testNumGroups:       1,
 			testGroupName:       "KeyAdmin",
 			testExpectedError:   nil,
@@ -295,8 +289,8 @@ func TestGetGroupsForUser(t *testing.T) {
 		{
 			name:                "Non-existent filter value",
 			serverUrl:           server.URL,
-			userFilterAttribute: pointers.To("displayName"),
-			userFilterValue:     NonExistentFieldPtr,
+			userFilterAttribute: "displayName",
+			userFilterValue:     NonExistentField,
 			testNumGroups:       0,
 			testGroupName:       "",
 			testExpectedError:   nil,
@@ -304,8 +298,8 @@ func TestGetGroupsForUser(t *testing.T) {
 		{
 			name:                "Non-existent filter attribute",
 			serverUrl:           server.URL,
-			userFilterAttribute: NonExistentFieldPtr,
-			userFilterValue:     pointers.To("None"),
+			userFilterAttribute: NonExistentField,
+			userFilterValue:     "None",
 			testNumGroups:       0,
 			testGroupName:       "",
 			testExpectedError:   nil,
@@ -314,11 +308,11 @@ func TestGetGroupsForUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := setupTest(t, tt.serverUrl, nil, tt.userFilterAttribute)
+			p := setupTest(t, tt.serverUrl, "", tt.userFilterAttribute)
 
 			var userFilterValue = idmangv1.GetGroupsForUserRequest{}
-			if tt.userFilterValue != nil {
-				userFilterValue.UserId = *tt.userFilterValue
+			if tt.userFilterValue != "" {
+				userFilterValue.UserId = tt.userFilterValue
 			}
 
 			responseMsg, err := p.GetGroupsForUser(t.Context(),
@@ -346,6 +340,6 @@ func TestGetGroupsForUser(t *testing.T) {
 }
 
 func TestNewPlugin(t *testing.T) {
-	p := setupTest(t, "", nil, nil)
+	p := setupTest(t, "", "", "")
 	assert.NotNil(t, p)
 }

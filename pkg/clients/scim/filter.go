@@ -9,6 +9,7 @@ type FilterOperator string
 
 const (
 	FilterOperatorEqual      FilterOperator = "eq"
+	FilterOperatorGreater    FilterOperator = "gt"
 	FilterOperatorEqualCI    FilterOperator = "eq_ci" // Case-insensitive
 	FilterOperatorNotEqual   FilterOperator = "ne"
 	FilterOperatorContains   FilterOperator = "co"

@@ -369,7 +369,7 @@ func TestGetGroup(t *testing.T) {
 
 			client := getBasicClient(server.URL)
 
-			group, err := client.GetGroup(t.Context(), tt.groupID)
+			group, err := client.GetGroup(t.Context(), tt.groupID, "members")
 
 			if tt.expectError {
 				assert.Error(t, err)

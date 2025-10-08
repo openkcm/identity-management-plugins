@@ -20,7 +20,7 @@ func getLogger() hclog.Logger {
 	return slog2hclog.New(slog.Default(), logLevelPlugin)
 }
 
-func (p *Plugin) SetTestClient(t *testing.T, host string, groupFilterAttribute, userFilterAttribute *string) {
+func (p *Plugin) SetTestClient(t *testing.T, host string, groupFilterAttribute, userFilterAttribute string) {
 	t.Helper()
 
 	secretRef := commoncfg.SecretRef{
@@ -42,7 +42,8 @@ func (p *Plugin) SetTestClient(t *testing.T, host string, groupFilterAttribute, 
 
 	p.scimClient = client
 	p.params = config.Params{
-		GroupAttribute: groupFilterAttribute,
-		UserAttribute:  userFilterAttribute,
+		GroupAttribute:          groupFilterAttribute,
+		UserAttribute:           userFilterAttribute,
+		AllowSearchUsersByGroup: true,
 	}
 }
