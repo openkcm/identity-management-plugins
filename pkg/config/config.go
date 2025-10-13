@@ -3,8 +3,8 @@ package config
 import "github.com/openkcm/common-sdk/pkg/commoncfg"
 
 type Params struct {
-	GroupAttribute *string `yaml:"groupAttribute"`
-	UserAttribute  *string `yaml:"userAttribute"`
+	GroupAttribute commoncfg.SourceRef `yaml:"groupAttribute"`
+	UserAttribute  commoncfg.SourceRef `yaml:"userAttribute"`
 }
 
 type Config struct {
