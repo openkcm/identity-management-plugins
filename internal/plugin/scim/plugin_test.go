@@ -53,10 +53,6 @@ const (
 		`"totalResults":0,"itemsPerPage":1,"startIndex":0}`
 )
 
-func pointTo[T any](t T) *T {
-	return &t
-}
-
 var NonExistentFieldPtr *string = pointers.To(NonExistentField)
 
 func setupTest(t *testing.T, url string,
@@ -100,6 +96,7 @@ func TestGetAllGroups(t *testing.T) {
 		name              string
 		serverUrl         string
 		testNumGroups     int
+		testGroupId       string
 		testGroupName     string
 		testExpectedError *error
 	}{
@@ -107,6 +104,7 @@ func TestGetAllGroups(t *testing.T) {
 			name:              "Bad Server",
 			serverUrl:         "badurl",
 			testNumGroups:     0,
+			testGroupId:       "",
 			testGroupName:     "",
 			testExpectedError: &scim.ErrListGroups,
 		},
@@ -114,6 +112,7 @@ func TestGetAllGroups(t *testing.T) {
 			name:              "Good request",
 			serverUrl:         server.URL,
 			testNumGroups:     1,
+			testGroupId:       "16e720aa-a009-4949-9bf9-aaaaaaaaaaaa",
 			testGroupName:     "KeyAdmin",
 			testExpectedError: nil,
 		},
@@ -135,6 +134,7 @@ func TestGetAllGroups(t *testing.T) {
 						t,
 						&idmangv1.GetAllGroupsResponse{
 							Groups: []*idmangv1.Group{{
+								Id:   tt.testGroupId,
 								Name: tt.testGroupName}},
 						},
 						responseMsg,
@@ -173,6 +173,7 @@ func TestGetUsersForGroup(t *testing.T) {
 		groupFilterValue     *string
 		testNumUsers         int
 		testUserName         string
+		testUserId           string
 		testExpectedError    *error
 	}{
 		{
@@ -182,6 +183,7 @@ func TestGetUsersForGroup(t *testing.T) {
 			groupFilterValue:     pointers.To("None"),
 			testNumUsers:         0,
 			testUserName:         "",
+			testUserId:           "",
 			testExpectedError:    &scim.ErrListUsers,
 		},
 		{
@@ -191,6 +193,7 @@ func TestGetUsersForGroup(t *testing.T) {
 			groupFilterValue:     pointers.To("None"),
 			testNumUsers:         1,
 			testUserName:         "None",
+			testUserId:           "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 			testExpectedError:    nil,
 		},
 		{
@@ -200,6 +203,7 @@ func TestGetUsersForGroup(t *testing.T) {
 			groupFilterValue:     NonExistentFieldPtr,
 			testNumUsers:         0,
 			testUserName:         "",
+			testUserId:           "",
 			testExpectedError:    nil,
 		},
 		{
@@ -209,6 +213,7 @@ func TestGetUsersForGroup(t *testing.T) {
 			groupFilterValue:     pointers.To("None"),
 			testNumUsers:         0,
 			testUserName:         "",
+			testUserId:           "",
 			testExpectedError:    nil,
 		},
 	}
@@ -233,6 +238,7 @@ func TestGetUsersForGroup(t *testing.T) {
 						t,
 						&idmangv1.GetUsersForGroupResponse{
 							Users: []*idmangv1.User{{
+								Id:   tt.testUserId,
 								Name: tt.testUserName},
 							},
 						},
@@ -271,6 +277,7 @@ func TestGetGroupsForUser(t *testing.T) {
 		userFilterAttribute string
 		userFilterValue     *string
 		testNumGroups       int
+		testGroupId         string
 		testGroupName       string
 		testExpectedError   *error
 	}{
@@ -278,8 +285,9 @@ func TestGetGroupsForUser(t *testing.T) {
 			name:                "Bad Server",
 			serverUrl:           "badurl",
 			userFilterAttribute: "displayName",
-			userFilterValue:     pointTo("None"),
+			userFilterValue:     pointers.To("None"),
 			testNumGroups:       0,
+			testGroupId:         "",
 			testGroupName:       "",
 			testExpectedError:   &scim.ErrListGroups,
 		},
@@ -289,6 +297,7 @@ func TestGetGroupsForUser(t *testing.T) {
 			userFilterAttribute: "displayName",
 			userFilterValue:     pointers.To("None"),
 			testNumGroups:       1,
+			testGroupId:         "16e720aa-a009-4949-9bf9-aaaaaaaaaaaa",
 			testGroupName:       "KeyAdmin",
 			testExpectedError:   nil,
 		},
@@ -298,6 +307,7 @@ func TestGetGroupsForUser(t *testing.T) {
 			userFilterAttribute: "displayName",
 			userFilterValue:     NonExistentFieldPtr,
 			testNumGroups:       0,
+			testGroupId:         "",
 			testGroupName:       "",
 			testExpectedError:   nil,
 		},
@@ -307,6 +317,7 @@ func TestGetGroupsForUser(t *testing.T) {
 			userFilterAttribute: NonExistentField,
 			userFilterValue:     pointers.To("None"),
 			testNumGroups:       0,
+			testGroupId:         "",
 			testGroupName:       "",
 			testExpectedError:   nil,
 		},
@@ -333,6 +344,7 @@ func TestGetGroupsForUser(t *testing.T) {
 						t,
 						&idmangv1.GetGroupsForUserResponse{
 							Groups: []*idmangv1.Group{{
+								Id:   tt.testGroupId,
 								Name: tt.testGroupName}},
 						},
 						responseMsg,
