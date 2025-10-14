@@ -34,6 +34,11 @@ const defaultFilterAttribute = "displayName"
 const defaultUsersFilterAttribute = defaultFilterAttribute
 const defaultGroupsFilterAttribute = defaultFilterAttribute
 
+type Params struct {
+	GroupAttribute string
+	UserAttribute  string
+}
+
 // Plugin is a simple test implementation of KeystoreProviderServer
 type Plugin struct {
 	idmangv1.UnsafeIdentityManagementServiceServer
@@ -41,7 +46,7 @@ type Plugin struct {
 
 	logger     hclog.Logger
 	scimClient *scim.Client
-	params     config.Params
+	params     Params
 }
 
 var (
@@ -54,6 +59,7 @@ func NewPlugin() *Plugin {
 }
 
 func (p *Plugin) SetLogger(logger hclog.Logger) {
+	p.logger = logger // Keep a copy of the logger for client creation
 	slog.SetDefault(hclog2slog.New(logger))
 }
 
@@ -61,7 +67,7 @@ func (p *Plugin) Configure(
 	ctx context.Context,
 	req *configv1.ConfigureRequest,
 ) (*configv1.ConfigureResponse, error) {
-	p.logger.Info("Configuring plugin")
+	slog.Info("Configuring plugin")
 
 	cfg := config.Config{}
 
@@ -70,21 +76,33 @@ func (p *Plugin) Configure(
 		return nil, ErrID.Wrapf(err, "Failed to get yaml Configuration")
 	}
 
-	p.params = cfg.Params
-
-	hostBytes, err := commoncfg.LoadValueFromSourceRef(cfg.Host)
+	groupAttrBytes, err := commoncfg.LoadValueFromSourceRef(cfg.Params.GroupAttribute)
 	if err != nil {
 		return nil, ErrID.Wrapf(err, "Failed loading host")
 	}
 
-	var host string
+	var groupAttr string
 
-	err = json.Unmarshal(hostBytes, &host)
+	err = json.Unmarshal(groupAttrBytes, &groupAttr)
 	if err != nil {
-		return nil, ErrID.Wrapf(err, "Failed unmarshalling connection")
+		return nil, ErrID.Wrapf(err, "Failed unmarshalling group attribute")
 	}
 
-	client, err := scim.NewClient(host, cfg.Auth, p.logger)
+	userAttrBytes, err := commoncfg.LoadValueFromSourceRef(cfg.Params.UserAttribute)
+	if err != nil {
+		return nil, ErrID.Wrapf(err, "Failed loading user attribute")
+	}
+
+	var userAttr string
+
+	err = json.Unmarshal(userAttrBytes, &userAttr)
+	if err != nil {
+		return nil, ErrID.Wrapf(err, "Failed unmarshalling user attribute")
+	}
+
+	p.params = Params{GroupAttribute: groupAttr, UserAttribute: userAttr}
+
+	client, err := scim.NewClient(cfg.Host, cfg.Auth, p.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +188,7 @@ func (p *Plugin) GetGroupsForUser(
 	return &idmangv1.GetGroupsForUserResponse{Groups: responseGroups}, nil
 }
 
-func getFilter(defaultAttribute, value string, setAttribute *string) scim.FilterExpression {
+func getFilter(defaultAttribute, value string, setAttribute string) scim.FilterExpression {
 	if value == "" {
 		return scim.NullFilterExpression{}
 	}
@@ -181,8 +199,8 @@ func getFilter(defaultAttribute, value string, setAttribute *string) scim.Filter
 		Value:     value,
 	}
 
-	if setAttribute != nil {
-		filter.Attribute = *setAttribute
+	if setAttribute != "" {
+		filter.Attribute = setAttribute
 	}
 
 	return filter

@@ -3,6 +3,7 @@ package scim
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -35,6 +36,7 @@ var (
 	ErrGetGroup                 = errors.New("error getting SCIM group")
 	ErrListGroups               = errors.New("error listing SCIM groups")
 	ErrHttpCreation             = errors.New("failed to create the http client")
+	ErrClientHost               = errors.New("failed to load the client host")
 	ErrClientID                 = errors.New("failed to load the client id")
 	ErrClientSecret             = errors.New("failed to load the client secret")
 	ErrParsingClientCertificate = errors.New("failed to parse client certificate x509 pair")
@@ -52,15 +54,28 @@ type basicAuth struct {
 	clientSecret string
 }
 
-func NewClient(host string, auth commoncfg.SecretRef, logger hclog.Logger) (*Client, error) {
-	switch auth.Type {
+func NewClient(hostRef commoncfg.SourceRef, authRef commoncfg.SecretRef,
+	logger hclog.Logger) (*Client, error) {
+	hostBytes, err := commoncfg.LoadValueFromSourceRef(hostRef)
+	if err != nil {
+		return nil, errs.Wrap(ErrClientHost, err)
+	}
+
+	var host string
+
+	err = json.Unmarshal(hostBytes, &host)
+	if err != nil {
+		return nil, errs.Wrap(ErrClientHost, err)
+	}
+
+	switch authRef.Type {
 	case commoncfg.BasicSecretType:
-		clientId, err := commoncfg.LoadValueFromSourceRef(auth.Basic.Username)
+		clientId, err := commoncfg.LoadValueFromSourceRef(authRef.Basic.Username)
 		if err != nil {
 			return nil, ErrClientID
 		}
 
-		clientSecret, err := commoncfg.LoadValueFromSourceRef(auth.Basic.Password)
+		clientSecret, err := commoncfg.LoadValueFromSourceRef(authRef.Basic.Password)
 		if err != nil {
 			return nil, ErrClientSecret
 		}
@@ -75,7 +90,7 @@ func NewClient(host string, auth commoncfg.SecretRef, logger hclog.Logger) (*Cli
 			},
 		}, nil
 	case commoncfg.MTLSSecretType:
-		mtls, err := commoncfg.LoadMTLSConfig(&auth.MTLS)
+		mtls, err := commoncfg.LoadMTLSConfig(&authRef.MTLS)
 		if err != nil {
 			return nil, errs.Wrap(ErrParsingClientCertificate, err)
 		}

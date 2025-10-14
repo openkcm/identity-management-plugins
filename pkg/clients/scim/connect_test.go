@@ -103,9 +103,16 @@ func getLogger() hclog.Logger {
 	return slog2hclog.New(slog.Default(), logLevelPlugin)
 }
 
+func getHostRef(host string) commoncfg.SourceRef {
+	return commoncfg.SourceRef{
+		Source: commoncfg.EmbeddedSourceValue,
+		Value:  "\"" + host + "\"",
+	}
+}
+
 func getBasicClient(url string) *scim.Client {
 	client, _ := scim.NewClient(
-		url,
+		getHostRef(url),
 		commoncfg.SecretRef{
 			Type: commoncfg.BasicSecretType,
 			Basic: commoncfg.BasicAuth{
@@ -180,7 +187,7 @@ func TestNewClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, err := scim.NewClient(tt.host, tt.auth, getLogger())
+			client, err := scim.NewClient(getHostRef(tt.host), tt.auth, getLogger())
 
 			if tt.expectError {
 				assert.Error(t, err)

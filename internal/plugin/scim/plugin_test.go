@@ -60,7 +60,7 @@ func pointTo[T any](t T) *T {
 var NonExistentFieldPtr *string = pointers.To(NonExistentField)
 
 func setupTest(t *testing.T, url string,
-	groupFilterAttribute, userFilterAttribute *string) *plugin.Plugin {
+	groupFilterAttribute, userFilterAttribute string) *plugin.Plugin {
 	t.Helper()
 
 	p := plugin.NewPlugin()
@@ -121,7 +121,7 @@ func TestGetAllGroups(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := setupTest(t, tt.serverUrl, nil, nil)
+			p := setupTest(t, tt.serverUrl, "", "")
 
 			responseMsg, err := p.GetAllGroups(t.Context(),
 				&idmangv1.GetAllGroupsRequest{})
@@ -169,7 +169,7 @@ func TestGetUsersForGroup(t *testing.T) {
 	tests := []struct {
 		name                 string
 		serverUrl            string
-		groupFilterAttribute *string
+		groupFilterAttribute string
 		groupFilterValue     *string
 		testNumUsers         int
 		testUserName         string
@@ -178,7 +178,7 @@ func TestGetUsersForGroup(t *testing.T) {
 		{
 			name:                 "Bad Server",
 			serverUrl:            "badurl",
-			groupFilterAttribute: pointers.To("displayName"),
+			groupFilterAttribute: "displayName",
 			groupFilterValue:     pointers.To("None"),
 			testNumUsers:         0,
 			testUserName:         "",
@@ -187,7 +187,7 @@ func TestGetUsersForGroup(t *testing.T) {
 		{
 			name:                 "Good request",
 			serverUrl:            server.URL,
-			groupFilterAttribute: pointers.To("displayName"),
+			groupFilterAttribute: "displayName",
 			groupFilterValue:     pointers.To("None"),
 			testNumUsers:         1,
 			testUserName:         "None",
@@ -196,7 +196,7 @@ func TestGetUsersForGroup(t *testing.T) {
 		{
 			name:                 "Non-existent filter value",
 			serverUrl:            server.URL,
-			groupFilterAttribute: pointers.To("displayName"),
+			groupFilterAttribute: "displayName",
 			groupFilterValue:     NonExistentFieldPtr,
 			testNumUsers:         0,
 			testUserName:         "",
@@ -205,7 +205,7 @@ func TestGetUsersForGroup(t *testing.T) {
 		{
 			name:                 "Non-existent filter attribute",
 			serverUrl:            server.URL,
-			groupFilterAttribute: NonExistentFieldPtr,
+			groupFilterAttribute: NonExistentField,
 			groupFilterValue:     pointers.To("None"),
 			testNumUsers:         0,
 			testUserName:         "",
@@ -215,7 +215,7 @@ func TestGetUsersForGroup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := setupTest(t, tt.serverUrl, tt.groupFilterAttribute, nil)
+			p := setupTest(t, tt.serverUrl, tt.groupFilterAttribute, "")
 
 			var request = idmangv1.GetUsersForGroupRequest{}
 			if tt.groupFilterValue != nil {
@@ -268,7 +268,7 @@ func TestGetGroupsForUser(t *testing.T) {
 	tests := []struct {
 		name                string
 		serverUrl           string
-		userFilterAttribute *string
+		userFilterAttribute string
 		userFilterValue     *string
 		testNumGroups       int
 		testGroupName       string
@@ -277,7 +277,7 @@ func TestGetGroupsForUser(t *testing.T) {
 		{
 			name:                "Bad Server",
 			serverUrl:           "badurl",
-			userFilterAttribute: pointTo("displayName"),
+			userFilterAttribute: "displayName",
 			userFilterValue:     pointTo("None"),
 			testNumGroups:       0,
 			testGroupName:       "",
@@ -286,7 +286,7 @@ func TestGetGroupsForUser(t *testing.T) {
 		{
 			name:                "Good request",
 			serverUrl:           server.URL,
-			userFilterAttribute: pointers.To("displayName"),
+			userFilterAttribute: "displayName",
 			userFilterValue:     pointers.To("None"),
 			testNumGroups:       1,
 			testGroupName:       "KeyAdmin",
@@ -295,7 +295,7 @@ func TestGetGroupsForUser(t *testing.T) {
 		{
 			name:                "Non-existent filter value",
 			serverUrl:           server.URL,
-			userFilterAttribute: pointers.To("displayName"),
+			userFilterAttribute: "displayName",
 			userFilterValue:     NonExistentFieldPtr,
 			testNumGroups:       0,
 			testGroupName:       "",
@@ -304,7 +304,7 @@ func TestGetGroupsForUser(t *testing.T) {
 		{
 			name:                "Non-existent filter attribute",
 			serverUrl:           server.URL,
-			userFilterAttribute: NonExistentFieldPtr,
+			userFilterAttribute: NonExistentField,
 			userFilterValue:     pointers.To("None"),
 			testNumGroups:       0,
 			testGroupName:       "",
@@ -314,7 +314,7 @@ func TestGetGroupsForUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := setupTest(t, tt.serverUrl, nil, tt.userFilterAttribute)
+			p := setupTest(t, tt.serverUrl, "", tt.userFilterAttribute)
 
 			var userFilterValue = idmangv1.GetGroupsForUserRequest{}
 			if tt.userFilterValue != nil {
@@ -346,6 +346,6 @@ func TestGetGroupsForUser(t *testing.T) {
 }
 
 func TestNewPlugin(t *testing.T) {
-	p := setupTest(t, "", nil, nil)
+	p := setupTest(t, "", "", "")
 	assert.NotNil(t, p)
 }

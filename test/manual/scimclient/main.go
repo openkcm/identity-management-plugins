@@ -115,7 +115,12 @@ func main() {
 		}
 	}
 
-	client, err := scim.NewClient(host, secretRef, getLogger())
+	hostRef := commoncfg.SourceRef{
+		Source: commoncfg.EmbeddedSourceValue,
+		Value:  "\"" + host + "\"",
+	}
+
+	client, err := scim.NewClient(hostRef, secretRef, getLogger())
 	if err != nil {
 		fmt.Println("Error creating SCIM client:", err.Error())
 		os.Exit(1)

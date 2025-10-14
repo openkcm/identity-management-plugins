@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/openkcm/identity-management-plugins/pkg/clients/scim"
-	"github.com/openkcm/identity-management-plugins/pkg/config"
 )
 
 func getLogger() hclog.Logger {
@@ -20,7 +19,7 @@ func getLogger() hclog.Logger {
 	return slog2hclog.New(slog.Default(), logLevelPlugin)
 }
 
-func (p *Plugin) SetTestClient(t *testing.T, host string, groupFilterAttribute, userFilterAttribute *string) {
+func (p *Plugin) SetTestClient(t *testing.T, host string, groupFilterAttribute, userFilterAttribute string) {
 	t.Helper()
 
 	secretRef := commoncfg.SecretRef{
@@ -37,11 +36,16 @@ func (p *Plugin) SetTestClient(t *testing.T, host string, groupFilterAttribute, 
 		},
 	}
 
-	client, err := scim.NewClient(host, secretRef, getLogger())
+	hostRef := commoncfg.SourceRef{
+		Source: commoncfg.EmbeddedSourceValue,
+		Value:  "\"" + host + "\"",
+	}
+
+	client, err := scim.NewClient(hostRef, secretRef, getLogger())
 	assert.NoError(t, err)
 
 	p.scimClient = client
-	p.params = config.Params{
+	p.params = Params{
 		GroupAttribute: groupFilterAttribute,
 		UserAttribute:  userFilterAttribute,
 	}
