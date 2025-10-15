@@ -22,12 +22,16 @@ import (
 )
 
 var (
-	ErrID               = oops.In("Identity management Plugin")
-	ErrNoScimClient     = errors.New("no scim client exists")
-	ErrPluginCreation   = errors.New("failed to create plugin")
-	ErrGetGroupsForUser = errors.New("failed to get groups for user")
-	ErrGetUsersForGroup = errors.New("failed to get users for group")
-	ErrNoID             = errors.New("no filter id provided")
+	ErrID                     = oops.In("Identity management Plugin")
+	ErrNoScimClient           = errors.New("no scim client exists")
+	ErrPluginCreation         = errors.New("failed to create plugin")
+	ErrGetGroup               = errors.New("failed to get group")
+	ErrGetAllGroups           = errors.New("failed to get allx group")
+	ErrGetGroupNonExistent    = errors.New("group does not existent")
+	ErrGetGroupMultipleGroups = errors.New("more than one group")
+	ErrGetGroupsForUser       = errors.New("failed to get groups for user")
+	ErrGetUsersForGroup       = errors.New("failed to get users for group")
+	ErrNoID                   = errors.New("no filter id provided")
 )
 
 const defaultFilterAttribute = "displayName"
@@ -112,19 +116,45 @@ func (p *Plugin) Configure(
 	return &configv1.ConfigureResponse{}, nil
 }
 
+func (p *Plugin) GetGroup(
+	ctx context.Context,
+	request *idmangv1.GetGroupRequest,
+) (*idmangv1.GetGroupResponse, error) {
+	if p.scimClient == nil {
+		return nil, ErrNoScimClient
+	}
+
+	attr := p.params.GroupAttribute
+	filter := getFilter(defaultGroupsFilterAttribute, request.GetGroupName(), attr)
+
+	responseGroups, err := p.listGroups(ctx, filter)
+	if err != nil {
+		return nil, errs.Wrap(ErrGetGroup, err)
+	}
+
+	if len(responseGroups) == 0 {
+		return nil, errs.Wrap(ErrGetGroup, ErrGetGroupNonExistent)
+	} else if len(responseGroups) > 1 {
+		return nil, errs.Wrap(ErrGetGroup, ErrGetGroupMultipleGroups)
+	}
+
+	return &idmangv1.GetGroupResponse{Group: responseGroups[0]}, nil
+}
+
 func (p *Plugin) GetAllGroups(
 	ctx context.Context,
 	request *idmangv1.GetAllGroupsRequest,
 ) (*idmangv1.GetAllGroupsResponse, error) {
 	groups, err := p.scimClient.ListGroups(ctx, http.MethodGet, scim.NullFilterExpression{}, nil, nil)
 	if err != nil {
-		return nil, errs.Wrap(ErrGetGroupsForUser, err)
+		return nil, errs.Wrap(ErrGetAllGroups, err)
 	}
 
 	responseGroups := make([]*idmangv1.Group, len(groups.Resources))
 
 	for i, group := range groups.Resources {
-		responseGroups[i] = &idmangv1.Group{Name: group.DisplayName}
+		responseGroups[i] = &idmangv1.Group{Id: group.ID,
+			Name: group.DisplayName}
 	}
 
 	return &idmangv1.GetAllGroupsResponse{Groups: responseGroups}, nil
@@ -153,7 +183,8 @@ func (p *Plugin) GetUsersForGroup(
 	responseUsers := make([]*idmangv1.User, len(users.Resources))
 
 	for i, user := range users.Resources {
-		responseUsers[i] = &idmangv1.User{Name: user.DisplayName}
+		responseUsers[i] = &idmangv1.User{Id: user.ID,
+			Name: user.DisplayName}
 	}
 
 	return &idmangv1.GetUsersForGroupResponse{Users: responseUsers}, nil
@@ -170,22 +201,33 @@ func (p *Plugin) GetGroupsForUser(
 	attr := p.params.UserAttribute
 	filter := getFilter(defaultUsersFilterAttribute, request.GetUserId(), attr)
 
+	responseGroups, err := p.listGroups(ctx, filter)
+	if err != nil {
+		return nil, errs.Wrap(ErrGetGroupsForUser, err)
+	}
+
+	return &idmangv1.GetGroupsForUserResponse{Groups: responseGroups}, nil
+}
+
+func (p *Plugin) listGroups(ctx context.Context, filter scim.FilterExpression,
+) ([]*idmangv1.Group, error) {
 	if (filter == scim.NullFilterExpression{}) {
-		return nil, errs.Wrap(ErrGetGroupsForUser, ErrNoID)
+		return nil, ErrNoID
 	}
 
 	groups, err := p.scimClient.ListGroups(ctx, http.MethodPost, filter, nil, nil)
 	if err != nil {
-		return nil, errs.Wrap(ErrGetGroupsForUser, err)
+		return nil, err
 	}
 
 	responseGroups := make([]*idmangv1.Group, len(groups.Resources))
 
 	for i, group := range groups.Resources {
-		responseGroups[i] = &idmangv1.Group{Name: group.DisplayName}
+		responseGroups[i] = &idmangv1.Group{Id: group.ID,
+			Name: group.DisplayName}
 	}
 
-	return &idmangv1.GetGroupsForUserResponse{Groups: responseGroups}, nil
+	return responseGroups, nil
 }
 
 func getFilter(defaultAttribute, value string, setAttribute string) scim.FilterExpression {
