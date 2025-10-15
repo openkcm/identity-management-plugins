@@ -193,7 +193,7 @@ func getGroup(ctx context.Context, client *scim.Client, id string) {
 		os.Exit(1)
 	}
 
-	group, err := client.GetGroup(ctx, id)
+	group, err := client.GetGroup(ctx, id, "members")
 	if err != nil {
 		fmt.Println("Error getting group:", err.Error())
 		os.Exit(1)
