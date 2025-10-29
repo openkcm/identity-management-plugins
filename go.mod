@@ -5,7 +5,7 @@ go 1.24.5
 require (
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/magodo/slog2hclog v0.0.0-20240614031327-090ebd72a033
-	github.com/openkcm/common-sdk v1.4.7
+	github.com/openkcm/common-sdk v1.5.0
 	github.com/openkcm/plugin-sdk v0.8.0
 	github.com/samber/oops v1.19.3
 	github.com/stretchr/testify v1.11.1
@@ -23,7 +23,7 @@ require (
 	github.com/hashicorp/yamux v0.1.2 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mcuadros/go-defaults v1.2.0 // indirect
+	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/oklog/run v1.1.0 // indirect
 	github.com/oklog/ulid/v2 v2.1.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
@@ -45,4 +45,5 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250826171959-ef028d996bc1 // indirect
 	google.golang.org/grpc v1.76.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
+	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 )
