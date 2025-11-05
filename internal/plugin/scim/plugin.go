@@ -11,6 +11,8 @@ import (
 	"github.com/openkcm/common-sdk/pkg/commoncfg"
 	"github.com/openkcm/plugin-sdk/pkg/hclog2slog"
 	"github.com/samber/oops"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gopkg.in/yaml.v3"
 
 	idmangv1 "github.com/openkcm/plugin-sdk/proto/plugin/identity_management/v1"
@@ -27,7 +29,7 @@ var (
 	ErrPluginCreation         = errors.New("failed to create plugin")
 	ErrGetGroup               = errors.New("failed to get group")
 	ErrGetAllGroups           = errors.New("failed to get allx group")
-	ErrGetGroupNonExistent    = errors.New("group does not existent")
+	ErrGetGroupNonExistent    = status.New(codes.NotFound, "group does not exist").Err()
 	ErrGetGroupMultipleGroups = errors.New("more than one group")
 	ErrGetGroupsForUser       = errors.New("failed to get groups for user")
 	ErrGetUsersForGroup       = errors.New("failed to get users for group")
@@ -133,7 +135,7 @@ func (p *Plugin) GetGroup(
 	}
 
 	if len(responseGroups) == 0 {
-		return nil, errs.Wrap(ErrGetGroup, ErrGetGroupNonExistent)
+		return nil, ErrGetGroupNonExistent
 	} else if len(responseGroups) > 1 {
 		return nil, errs.Wrap(ErrGetGroup, ErrGetGroupMultipleGroups)
 	}
