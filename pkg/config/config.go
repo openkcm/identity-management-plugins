@@ -11,7 +11,14 @@ type Params struct {
 }
 
 type Config struct {
-	Host   commoncfg.SourceRef `yaml:"host"`
-	Auth   commoncfg.SecretRef `yaml:"auth"`
-	Params Params              `yaml:"params"`
+	Host        commoncfg.SourceRef `yaml:"host"`
+	Auth        commoncfg.SecretRef `yaml:"auth"`
+	AuthContext commoncfg.SourceRef `yaml:"authContext"`
+	Params      Params              `yaml:"params"`
+}
+
+type AuthContextConfig struct {
+	HostField    string            `yaml:"hostField"`
+	HeaderFields map[string]string `yaml:"headerFields"`
+	BasePath     string            `yaml:"basePath"`
 }
