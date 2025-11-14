@@ -115,12 +115,7 @@ func main() {
 		}
 	}
 
-	hostRef := commoncfg.SourceRef{
-		Source: commoncfg.EmbeddedSourceValue,
-		Value:  "\"" + host + "\"",
-	}
-
-	client, err := scim.NewClient(hostRef, secretRef, getLogger())
+	client, err := scim.NewClient(secretRef, getLogger())
 	if err != nil {
 		fmt.Println("Error creating SCIM client:", err.Error())
 		os.Exit(1)
@@ -133,21 +128,21 @@ func main() {
 
 	switch action {
 	case "GetUser":
-		getUser(ctx, client, id)
+		getUser(ctx, client, host, id)
 	case "ListUsers":
-		listUsers(ctx, client, method, cursor, count, displayName)
+		listUsers(ctx, client, host, method, cursor, count, displayName)
 	case "GetGroup":
-		getGroup(ctx, client, id)
+		getGroup(ctx, client, host, id)
 	case "ListGroups":
-		listGroups(ctx, client, method, cursor, count, displayName)
+		listGroups(ctx, client, host, method, cursor, count, displayName)
 	default:
 		fmt.Println("Invalid action. Supported actions are: GetUser, ListUsers, GetGroup, ListGroups")
 		os.Exit(1)
 	}
 }
 
-func getUser(ctx context.Context, client *scim.Client, id string) {
-	user, err := client.GetUser(ctx, id)
+func getUser(ctx context.Context, client *scim.Client, host, id string) {
+	user, err := client.GetUser(ctx, id, scim.RequestParams{Host: host})
 	if err != nil {
 		fmt.Println("Error getting user:", err.Error())
 		os.Exit(1)
@@ -158,6 +153,7 @@ func getUser(ctx context.Context, client *scim.Client, id string) {
 
 func listUsers(ctx context.Context,
 	client *scim.Client,
+	host string,
 	method string,
 	cursor string,
 	count int,
@@ -174,7 +170,13 @@ func listUsers(ctx context.Context,
 		filter = scim.NullFilterExpression{}
 	}
 
-	users, err := client.ListUsers(ctx, method, filter, &cursor, &count)
+	users, err := client.ListUsers(ctx, scim.RequestParams{
+		Host:   host,
+		Method: method,
+		Filter: filter,
+		Cursor: &cursor,
+		Count:  &count,
+	})
 	if err != nil {
 		fmt.Println("Error listing users:", err.Error())
 		os.Exit(1)
@@ -187,13 +189,13 @@ func listUsers(ctx context.Context,
 	}
 }
 
-func getGroup(ctx context.Context, client *scim.Client, id string) {
+func getGroup(ctx context.Context, client *scim.Client, host string, id string) {
 	if id == "" {
 		fmt.Println("ID is required for GetGroup action")
 		os.Exit(1)
 	}
 
-	group, err := client.GetGroup(ctx, id, "members")
+	group, err := client.GetGroup(ctx, id, "members", scim.RequestParams{Host: host})
 	if err != nil {
 		fmt.Println("Error getting group:", err.Error())
 		os.Exit(1)
@@ -205,6 +207,7 @@ func getGroup(ctx context.Context, client *scim.Client, id string) {
 func listGroups(
 	ctx context.Context,
 	client *scim.Client,
+	host string,
 	method string,
 	cursor string,
 	count int,
@@ -221,7 +224,13 @@ func listGroups(
 		filter = scim.NullFilterExpression{}
 	}
 
-	groups, err := client.ListGroups(ctx, method, filter, &cursor, &count)
+	groups, err := client.ListGroups(ctx, scim.RequestParams{
+		Host:   host,
+		Method: method,
+		Filter: filter,
+		Cursor: &cursor,
+		Count:  &count,
+	})
 	if err != nil {
 		fmt.Println("Error listing groups:", err.Error())
 		os.Exit(1)
