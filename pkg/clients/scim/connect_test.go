@@ -103,16 +103,18 @@ func getLogger() hclog.Logger {
 	return slog2hclog.New(slog.Default(), logLevelPlugin)
 }
 
-func getHostRef(host string) commoncfg.SourceRef {
-	return commoncfg.SourceRef{
-		Source: commoncfg.EmbeddedSourceValue,
-		Value:  host,
-	}
+func getServer(t *testing.T, responseStatus int, responseBody string) *httptest.Server {
+	t.Helper()
+
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(responseStatus)
+		_, err := w.Write([]byte(responseBody))
+		assert.NoError(t, err)
+	}))
 }
 
-func getBasicClient(url string) *scim.Client {
+func getBasicClient() *scim.Client {
 	client, _ := scim.NewClient(
-		getHostRef(url),
 		commoncfg.SecretRef{
 			Type: commoncfg.BasicSecretType,
 			Basic: commoncfg.BasicAuth{
@@ -187,7 +189,7 @@ func TestNewClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, err := scim.NewClient(getHostRef(tt.host), tt.auth, getLogger())
+			client, err := scim.NewClient(tt.auth, getLogger())
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -241,16 +243,12 @@ func TestGetUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(tt.responseStatus)
-				_, err := w.Write([]byte(tt.responseBody))
-				assert.NoError(t, err)
-			}))
+			server := getServer(t, tt.responseStatus, tt.responseBody)
 			defer server.Close()
 
-			client := getBasicClient(server.URL)
+			client := getBasicClient()
 
-			user, err := client.GetUser(t.Context(), tt.userID)
+			user, err := client.GetUser(t.Context(), tt.userID, scim.RequestParams{Host: server.URL})
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -301,19 +299,21 @@ func TestListUsers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(tt.responseStatus)
-				_, err := w.Write([]byte(tt.responseBody))
-				assert.NoError(t, err)
-			}))
+			server := getServer(t, tt.responseStatus, tt.responseBody)
 			defer server.Close()
 
-			client := getBasicClient(server.URL)
+			client := getBasicClient()
 
-			filter := scim.FilterComparison{Attribute: "DisplayName",
-				Operator: scim.FilterOperatorEqual,
-				Value:    "None"}
-			users, err := client.ListUsers(t.Context(), tt.method, filter, nil, nil)
+			filter := scim.FilterComparison{
+				Attribute: "DisplayName",
+				Operator:  scim.FilterOperatorEqual,
+				Value:     "None",
+			}
+			users, err := client.ListUsers(t.Context(), scim.RequestParams{
+				Host:   server.URL,
+				Method: tt.method,
+				Filter: filter,
+			})
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -367,16 +367,12 @@ func TestGetGroup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(tt.responseStatus)
-				_, err := w.Write([]byte(tt.responseBody))
-				assert.NoError(t, err)
-			}))
+			server := getServer(t, tt.responseStatus, tt.responseBody)
 			defer server.Close()
 
-			client := getBasicClient(server.URL)
+			client := getBasicClient()
 
-			group, err := client.GetGroup(t.Context(), tt.groupID, "members")
+			group, err := client.GetGroup(t.Context(), tt.groupID, "members", scim.RequestParams{Host: server.URL})
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -427,19 +423,21 @@ func TestListGroups(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(tt.responseStatus)
-				_, err := w.Write([]byte(tt.responseBody))
-				assert.NoError(t, err)
-			}))
+			server := getServer(t, tt.responseStatus, tt.responseBody)
 			defer server.Close()
 
-			client := getBasicClient(server.URL)
+			client := getBasicClient()
 
-			filter := scim.FilterComparison{Attribute: "DisplayName",
-				Operator: scim.FilterOperatorEqual,
-				Value:    "KeyAdmin"}
-			groups, err := client.ListGroups(t.Context(), tt.method, filter, nil, nil)
+			filter := scim.FilterComparison{
+				Attribute: "DisplayName",
+				Operator:  scim.FilterOperatorEqual,
+				Value:     "KeyAdmin",
+			}
+			groups, err := client.ListGroups(t.Context(), scim.RequestParams{
+				Host:   server.URL,
+				Method: tt.method,
+				Filter: filter,
+			})
 
 			if tt.expectError {
 				assert.Error(t, err)

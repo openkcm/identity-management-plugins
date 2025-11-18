@@ -34,17 +34,23 @@ var (
 	ErrListUsers                = errors.New("error listing SCIM users")
 	ErrGetGroup                 = errors.New("error getting SCIM group")
 	ErrListGroups               = errors.New("error listing SCIM groups")
-	ErrHttpCreation             = errors.New("failed to create the http client")
-	ErrClientHost               = errors.New("failed to load the client host")
 	ErrClientID                 = errors.New("failed to load the client id")
 	ErrClientSecret             = errors.New("failed to load the client secret")
 	ErrParsingClientCertificate = errors.New("failed to parse client certificate x509 pair")
 )
 
+type RequestParams struct {
+	Host    string
+	Method  string
+	Filter  FilterExpression
+	Cursor  *string
+	Count   *int
+	Headers map[string]string
+}
+
 type Client struct {
 	logger     hclog.Logger
 	httpClient *http.Client
-	host       string
 
 	basicAuth *basicAuth
 }
@@ -53,13 +59,7 @@ type basicAuth struct {
 	clientSecret string
 }
 
-func NewClient(hostRef commoncfg.SourceRef, authRef commoncfg.SecretRef,
-	logger hclog.Logger) (*Client, error) {
-	hostBytes, err := commoncfg.LoadValueFromSourceRef(hostRef)
-	if err != nil {
-		return nil, errs.Wrap(ErrClientHost, err)
-	}
-
+func NewClient(authRef commoncfg.SecretRef, logger hclog.Logger) (*Client, error) {
 	switch authRef.Type {
 	case commoncfg.BasicSecretType:
 		clientId, err := commoncfg.LoadValueFromSourceRef(authRef.Basic.Username)
@@ -75,7 +75,6 @@ func NewClient(hostRef commoncfg.SourceRef, authRef commoncfg.SecretRef,
 		return &Client{
 			logger:     logger,
 			httpClient: &http.Client{},
-			host:       string(hostBytes),
 			basicAuth: &basicAuth{
 				clientID:     string(clientId),
 				clientSecret: string(clientSecret),
@@ -94,7 +93,6 @@ func NewClient(hostRef commoncfg.SourceRef, authRef commoncfg.SecretRef,
 					TLSClientConfig: mtls,
 				},
 			},
-			host: string(hostBytes),
 		}, nil
 	default:
 		return nil, ErrAuthNotImplemented
@@ -102,8 +100,10 @@ func NewClient(hostRef commoncfg.SourceRef, authRef commoncfg.SecretRef,
 }
 
 // GetUser retrieves a SCIM user by its ID.
-func (c *Client) GetUser(ctx context.Context, id string) (*User, error) {
-	resp, err := c.baseCreateAndExecuteHTTPRequest(ctx, http.MethodGet, BasePathUsers+"/"+id, nil, nil)
+func (c *Client) GetUser(ctx context.Context, id string, params RequestParams) (*User, error) {
+	resp, err := c.baseCreateAndExecuteHTTPRequest(
+		ctx, params.Host, http.MethodGet, BasePathUsers+"/"+id, nil, nil, params.Headers,
+	)
 
 	if resp != nil {
 		defer func() {
@@ -129,14 +129,8 @@ func (c *Client) GetUser(ctx context.Context, id string) (*User, error) {
 // ListUsers retrieves a list of SCIM users.
 // It supports filtering, pagination (using cursor), and count parameters.
 // The useHTTPPost parameter determines whether to use POST method + /.search path for the request.
-func (c *Client) ListUsers(
-	ctx context.Context,
-	method string,
-	filter FilterExpression,
-	cursor *string,
-	count *int,
-) (*UserList, error) {
-	resp, err := c.createAndExecuteHTTPRequest(ctx, method, BasePathUsers, filter, cursor, count)
+func (c *Client) ListUsers(ctx context.Context, params RequestParams) (*UserList, error) {
+	resp, err := c.createAndExecuteHTTPRequest(ctx, params, BasePathUsers)
 	if err != nil {
 		return nil, errs.Wrap(ErrListUsers, err)
 	}
@@ -157,14 +151,21 @@ func (c *Client) ListUsers(
 }
 
 // GetGroup retrieves a SCIM group by its ID.
-func (c *Client) GetGroup(ctx context.Context, id string, groupMemberAttribute string) (*Group, error) {
+func (c *Client) GetGroup(
+	ctx context.Context,
+	id string,
+	groupMemberAttribute string,
+	params RequestParams,
+) (*Group, error) {
 	var queryString *string
 
 	if groupMemberAttribute != "" {
 		queryString = pointers.String("attributes=" + groupMemberAttribute)
 	}
 
-	resp, err := c.baseCreateAndExecuteHTTPRequest(ctx, http.MethodGet, BasePathGroups+"/"+id, queryString, nil)
+	resp, err := c.baseCreateAndExecuteHTTPRequest(
+		ctx, params.Host, http.MethodGet, BasePathGroups+"/"+id, queryString, nil, params.Headers,
+	)
 
 	if resp != nil {
 		defer func() {
@@ -192,12 +193,9 @@ func (c *Client) GetGroup(ctx context.Context, id string, groupMemberAttribute s
 // The useHTTPPost parameter determines whether to use POST method + /.search path for the request.
 func (c *Client) ListGroups(
 	ctx context.Context,
-	method string,
-	filter FilterExpression,
-	cursor *string,
-	count *int,
+	params RequestParams,
 ) (*GroupList, error) {
-	resp, err := c.createAndExecuteHTTPRequest(ctx, method, BasePathGroups, filter, cursor, count)
+	resp, err := c.createAndExecuteHTTPRequest(ctx, params, BasePathGroups)
 
 	if resp != nil {
 		defer func() {
@@ -237,18 +235,24 @@ func (c *Client) doRequest(req *http.Request) (*http.Response, error) {
 
 func (c *Client) baseCreateAndExecuteHTTPRequest(
 	ctx context.Context,
+	host string,
 	method string,
 	resourcePath string,
 	queryString *string,
 	body io.Reader,
+	headers map[string]string,
 ) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, method, c.host+resourcePath, body)
+	req, err := http.NewRequestWithContext(ctx, method, host+resourcePath, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	if queryString != nil {
 		req.URL.RawQuery = *queryString
+	}
+
+	for key, value := range headers {
+		req.Header.Set(key, value)
 	}
 
 	resp, err := c.doRequest(req)
@@ -266,11 +270,8 @@ func (c *Client) baseCreateAndExecuteHTTPRequest(
 // For POST method, parameters are included in the request body.
 func (c *Client) createAndExecuteHTTPRequest(
 	ctx context.Context,
-	method string,
+	params RequestParams,
 	basePath string,
-	filter FilterExpression,
-	cursor *string,
-	count *int,
 ) (*http.Response, error) {
 	resourcePath := basePath + "/"
 
@@ -279,18 +280,20 @@ func (c *Client) createAndExecuteHTTPRequest(
 		queryString string
 	)
 
-	if method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch {
+	if params.Method == http.MethodPost || params.Method == http.MethodPut || params.Method == http.MethodPatch {
 		resourcePath += PostSearchPath
 
 		var err error
 
-		body, err = buildBodyFromParams(filter, count, cursor)
+		body, err = buildBodyFromParams(params.Filter, params.Count, params.Cursor)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build request: %w", err)
 		}
 	} else {
-		queryString = buildQueryStringFromParams(filter, cursor, count)
+		queryString = buildQueryStringFromParams(params.Filter, params.Cursor, params.Count)
 	}
 
-	return c.baseCreateAndExecuteHTTPRequest(ctx, method, resourcePath, pointers.String(queryString), body)
+	return c.baseCreateAndExecuteHTTPRequest(
+		ctx, params.Host, params.Method, resourcePath, pointers.String(queryString), body, params.Headers,
+	)
 }
