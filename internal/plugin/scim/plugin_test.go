@@ -54,11 +54,12 @@ const (
 )
 
 var NonExistentFieldPtr *string = pointers.To(NonExistentField)
+var buildInfo = "{}"
 
 func setupTest(t *testing.T, url string, groupFilterAttribute, userFilterAttribute string) *plugin.Plugin {
 	t.Helper()
 
-	p := plugin.NewPlugin()
+	p := plugin.NewPlugin(buildInfo)
 	p.SetTestClient(t, url, groupFilterAttribute, userFilterAttribute)
 	assert.NotNil(t, p)
 
@@ -66,7 +67,7 @@ func setupTest(t *testing.T, url string, groupFilterAttribute, userFilterAttribu
 }
 
 func TestNoScimClient(t *testing.T) {
-	p := plugin.NewPlugin()
+	p := plugin.NewPlugin(buildInfo)
 
 	groupRequest := idmangv1.GetUsersForGroupRequest{}
 	_, err := p.GetUsersForGroup(t.Context(), &groupRequest)

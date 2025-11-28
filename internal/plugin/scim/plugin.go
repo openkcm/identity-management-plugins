@@ -72,6 +72,7 @@ type Plugin struct {
 	logger     hclog.Logger
 	scimClient *scim.Client
 	params     Params
+	buildInfo  string
 }
 
 var (
@@ -79,8 +80,10 @@ var (
 	_ configv1.ConfigServer                    = (*Plugin)(nil)
 )
 
-func NewPlugin() *Plugin {
-	return &Plugin{}
+func NewPlugin(buildInfo string) *Plugin {
+	return &Plugin{
+		buildInfo: buildInfo,
+	}
 }
 
 func (p *Plugin) SetLogger(logger hclog.Logger) {
@@ -165,7 +168,9 @@ func (p *Plugin) Configure(
 
 	p.scimClient = client
 
-	return &configv1.ConfigureResponse{}, nil
+	return &configv1.ConfigureResponse{
+		BuildInfo: &p.buildInfo,
+	}, nil
 }
 
 func (p *Plugin) GetGroup(
