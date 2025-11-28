@@ -177,7 +177,7 @@ func TestNewClient(t *testing.T) {
 					CertKey: commoncfg.SourceRef{
 						Source: commoncfg.EmbeddedSourceValue,
 						Value:  "bad"},
-					ServerCA: commoncfg.SourceRef{
+					ServerCA: &commoncfg.SourceRef{
 						Source: commoncfg.EmbeddedSourceValue,
 						Value:  "bad"},
 				},
