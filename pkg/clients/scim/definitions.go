@@ -4,7 +4,7 @@ package scim
 type BaseResource struct {
 	ID         string   `json:"id"`
 	ExternalID string   `json:"externalId,omitempty"`
-	Meta       struct{} `json:"meta,omitempty"`
+	Meta       struct{} `json:"meta"`
 	Schemas    []string `json:"schemas,omitempty"`
 }
 
