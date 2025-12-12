@@ -35,6 +35,7 @@ test: clean
 		-- -count=1 -covermode=atomic -cover \
 		./cmd/... ./pkg/... ./internal/... \
 		-args -test.gocoverdir=$(CURDIR)/cover/unit
+	go tool covdata textfmt -i=./cover/unit -o cover.out
 
 extract-version:
 	echo \{\"version\": \"$(shell tail -c +2 VERSION)\"\} > build_version.json
