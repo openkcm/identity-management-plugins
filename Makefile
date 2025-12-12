@@ -34,7 +34,7 @@ test: clean
 	env TEST_ENV=make gotestsum --format testname --junitfile junit.xml \
 		-- -count=1 -covermode=atomic -cover \
 		./cmd/... ./pkg/... ./internal/... \
-		-args -test.gocoverdir=$(pwd)/cover/unit
+		-args -test.gocoverdir=$(CURDIR)/cover/unit
 
 extract-version:
 	echo \{\"version\": \"$(shell tail -c +2 VERSION)\"\} > build_version.json
