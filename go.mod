@@ -7,7 +7,7 @@ require (
 	github.com/magodo/slog2hclog v0.0.0-20240614031327-090ebd72a033
 	github.com/openkcm/common-sdk v1.6.2
 	github.com/openkcm/plugin-sdk v0.9.1
-	github.com/samber/oops v1.19.4
+	github.com/samber/oops v1.21.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.77.0
 	gopkg.in/yaml.v3 v3.0.1
