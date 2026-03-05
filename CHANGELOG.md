@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.0](https://github.com/openkcm/identity-management-plugins/compare/v0.1.0...v0.2.0) (2026-03-05)
+
+
+### Features
+
+* add auth context to SCIM requests ([#43](https://github.com/openkcm/identity-management-plugins/issues/43)) ([f4d0cbf](https://github.com/openkcm/identity-management-plugins/commit/f4d0cbf271ebfac79a6c68f84698cf0c7917c522))
+* show plugin buildinfo in cmk version endpoint ([#49](https://github.com/openkcm/identity-management-plugins/issues/49)) ([e04de74](https://github.com/openkcm/identity-management-plugins/commit/e04de748ca668312d45814981b38b502e0b9929d))
+
+
+### Bug Fixes
+
+* Fix linter error ([#51](https://github.com/openkcm/identity-management-plugins/issues/51)) ([de100dd](https://github.com/openkcm/identity-management-plugins/commit/de100dd004ddac1aa7761b904bc99817443bfe82))
+* Fix test cover dir ([#55](https://github.com/openkcm/identity-management-plugins/issues/55)) ([fe418e4](https://github.com/openkcm/identity-management-plugins/commit/fe418e4b20b42bd05f4a7cd453492aab3ab38d49))
+* include changes into the publish.yaml workflow and Taskfile.yaml ([#68](https://github.com/openkcm/identity-management-plugins/issues/68)) ([5202e71](https://github.com/openkcm/identity-management-plugins/commit/5202e71a8c47bbcac0159da83322f67da74f877d))
+* Remove invalid golangci-lint config ([#50](https://github.com/openkcm/identity-management-plugins/issues/50)) ([a11b1bb](https://github.com/openkcm/identity-management-plugins/commit/a11b1bb094177276e204b6fdbd2fffb4821747ef))
+
 ## 0.1.0 (2025-10-27)
 
 
