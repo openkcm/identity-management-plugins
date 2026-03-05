@@ -9,4 +9,5 @@ includes:
       CODE_DIRS: '{{.ROOT_DIR}}/cmd/... {{.ROOT_DIR}}/internal/... {{.ROOT_DIR}}/pkg/...'
       COMPONENTS: 'scim'
       GENERATE_DOCS_INDEX: "false"
+      DOCKER_FILE_IDENTIFIER: 'plugins'
 
