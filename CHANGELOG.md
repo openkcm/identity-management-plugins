@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/openkcm/identity-management-plugins/compare/v0.2.0...v0.2.1) (2026-03-12)
+
+
+### Bug Fixes
+
+* Change dependabot config ([#76](https://github.com/openkcm/identity-management-plugins/issues/76)) ([a76572f](https://github.com/openkcm/identity-management-plugins/commit/a76572f62d4d697fa9165a4cb5738aa21678bf95))
+
 ## [0.2.0](https://github.com/openkcm/identity-management-plugins/compare/v0.1.0...v0.2.0) (2026-03-05)
 
 
