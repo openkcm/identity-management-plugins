@@ -7,7 +7,7 @@ toolchain go1.26.1
 require (
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/magodo/slog2hclog v0.0.0-20240614031327-090ebd72a033
-	github.com/openkcm/common-sdk v1.14.0
+	github.com/openkcm/common-sdk v1.14.1
 	github.com/openkcm/plugin-sdk v0.10.0
 	github.com/samber/oops v1.21.0
 	github.com/stretchr/testify v1.11.1
