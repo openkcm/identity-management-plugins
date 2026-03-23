@@ -2,6 +2,8 @@ module github.com/openkcm/identity-management-plugins
 
 go 1.25.6
 
+toolchain go1.26.1
+
 require (
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/magodo/slog2hclog v0.0.0-20240614031327-090ebd72a033
