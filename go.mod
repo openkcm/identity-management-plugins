@@ -8,7 +8,7 @@ require (
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/magodo/slog2hclog v0.0.0-20240614031327-090ebd72a033
 	github.com/openkcm/common-sdk v1.14.1
-	github.com/openkcm/plugin-sdk v0.10.0
+	github.com/openkcm/plugin-sdk v0.10.2
 	github.com/samber/oops v1.21.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.79.3
@@ -51,7 +51,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/exp v0.0.0-20250813145105-42675adae3e6 // indirect
 	golang.org/x/net v0.51.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260209200024-4cfbd4190f57 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
