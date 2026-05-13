@@ -53,8 +53,10 @@ const (
 		`"totalResults":0,"itemsPerPage":1,"startIndex":0}`
 )
 
-var NonExistentFieldPtr *string = pointers.To(NonExistentField)
-var buildInfo = "{}"
+var (
+	NonExistentFieldPtr *string = pointers.To(NonExistentField)
+	buildInfo                   = "{}"
+)
 
 func setupTest(t *testing.T, url string, groupFilterAttribute, userFilterAttribute string) *plugin.Plugin {
 	t.Helper()
@@ -135,7 +137,8 @@ func TestGetAllGroups(t *testing.T) {
 						&idmangv1.GetAllGroupsResponse{
 							Groups: []*idmangv1.Group{{
 								Id:   tt.testGroupId,
-								Name: tt.testGroupName}},
+								Name: tt.testGroupName,
+							}},
 						},
 						responseMsg,
 					)
@@ -227,7 +230,7 @@ func TestGetUsersForGroup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := setupTest(t, tt.serverUrl, tt.groupFilterAttribute, "")
 
-			var request = idmangv1.GetUsersForGroupRequest{}
+			request := idmangv1.GetUsersForGroupRequest{}
 			if tt.groupFilterValue != "" {
 				request.GroupId = tt.groupFilterValue
 			}
@@ -241,10 +244,12 @@ func TestGetUsersForGroup(t *testing.T) {
 					assert.Equal(
 						t,
 						&idmangv1.GetUsersForGroupResponse{
-							Users: []*idmangv1.User{{
-								Id:    tt.testUserID,
-								Name:  tt.testUserName,
-								Email: tt.testUserEmail},
+							Users: []*idmangv1.User{
+								{
+									Id:    tt.testUserID,
+									Name:  tt.testUserName,
+									Email: tt.testUserEmail,
+								},
 							},
 						},
 						responseMsg,
@@ -252,6 +257,59 @@ func TestGetUsersForGroup(t *testing.T) {
 				}
 			} else {
 				assert.ErrorIs(t, err, *tt.testExpectedError)
+			}
+		})
+	}
+}
+
+func TestGetUser(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte(GetUserResponse))
+		assert.NoError(t, err)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	tests := []struct {
+		name          string
+		serverUrl     string
+		userId        string
+		expectedID    string
+		expectedName  string
+		expectedEmail string
+		expectedError error
+	}{
+		{
+			name:          "User found",
+			serverUrl:     server.URL,
+			userId:        "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+			expectedID:    "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+			expectedName:  "cloudanalyst",
+			expectedEmail: "cloud.analyst@example.com",
+			expectedError: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := setupTest(t, tt.serverUrl, "", "")
+
+			resp, err := p.GetUser(
+				t.Context(),
+				&idmangv1.GetUserRequest{
+					UserId: tt.userId,
+				},
+			)
+
+			if tt.expectedError == nil {
+				assert.NoError(t, err)
+				assert.NotNil(t, resp)
+				assert.Equal(t, tt.expectedID, resp.GetUser().GetId())
+				assert.Equal(t, tt.expectedName, resp.GetUser().GetName())
+				assert.Equal(t, tt.expectedEmail, resp.GetUser().GetEmail())
+			} else {
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, tt.expectedError)
 			}
 		})
 	}
@@ -332,7 +390,7 @@ func TestGetGroupsForUser(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := setupTest(t, tt.serverUrl, "", tt.userFilterAttribute)
 
-			var userFilterValue = idmangv1.GetGroupsForUserRequest{}
+			userFilterValue := idmangv1.GetGroupsForUserRequest{}
 			if tt.userFilterValue != "" {
 				userFilterValue.UserId = tt.userFilterValue
 			}
@@ -350,7 +408,8 @@ func TestGetGroupsForUser(t *testing.T) {
 						&idmangv1.GetGroupsForUserResponse{
 							Groups: []*idmangv1.Group{{
 								Id:   tt.testGroupId,
-								Name: tt.testGroupName}},
+								Name: tt.testGroupName,
+							}},
 						},
 						responseMsg,
 					)
