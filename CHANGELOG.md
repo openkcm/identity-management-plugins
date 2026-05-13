@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/openkcm/identity-management-plugins/compare/v0.2.2...v0.3.0) (2026-05-13)
+
+
+### Features
+
+* expose GetUser grpc method ([#87](https://github.com/openkcm/identity-management-plugins/issues/87)) ([18d12d8](https://github.com/openkcm/identity-management-plugins/commit/18d12d8b272345ae86b6cf5c66406999ec0a6a3d))
+
 ## [0.2.2](https://github.com/openkcm/identity-management-plugins/compare/v0.2.1...v0.2.2) (2026-03-24)
 
 
