@@ -2,10 +2,9 @@ package testplugin_test
 
 import (
 	"context"
-	"log/slog"
 	"testing"
 
-	"github.com/magodo/slog2hclog"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 
 	idmangv1 "github.com/openkcm/plugin-sdk/proto/plugin/identity_management/v1"
@@ -15,10 +14,7 @@ import (
 
 func setupTest() *tp.TestPlugin {
 	p := tp.NewTestPlugin()
-	logLevelPlugin := new(slog.LevelVar)
-	logLevelPlugin.Set(slog.LevelError)
-
-	p.SetLogger(slog2hclog.New(slog.Default(), logLevelPlugin))
+	p.SetLogger(hclog.New(&hclog.LoggerOptions{Level: hclog.Error}))
 
 	return p
 }
