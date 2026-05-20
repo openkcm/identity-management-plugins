@@ -1,13 +1,11 @@
 package scim_test
 
 import (
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/hashicorp/go-hclog"
-	"github.com/magodo/slog2hclog"
 	"github.com/openkcm/common-sdk/pkg/commoncfg"
 	"github.com/stretchr/testify/assert"
 
@@ -97,10 +95,7 @@ var (
 )
 
 func getLogger() hclog.Logger {
-	logLevelPlugin := new(slog.LevelVar)
-	logLevelPlugin.Set(slog.LevelError)
-
-	return slog2hclog.New(slog.Default(), logLevelPlugin)
+	return hclog.New(&hclog.LoggerOptions{Level: hclog.Error})
 }
 
 func getServer(t *testing.T, responseStatus int, responseBody string) *httptest.Server {

@@ -11,7 +11,6 @@ import (
 	"os"
 
 	"github.com/hashicorp/go-hclog"
-	"github.com/magodo/slog2hclog"
 	"github.com/openkcm/common-sdk/pkg/commoncfg"
 
 	"github.com/openkcm/identity-management-plugins/pkg/clients/scim"
@@ -36,10 +35,7 @@ Options:
 const defaultCount = 100
 
 func getLogger() hclog.Logger {
-	logLevelPlugin := new(slog.LevelVar)
-	logLevelPlugin.Set(slog.LevelError)
-
-	return slog2hclog.New(slog.Default(), logLevelPlugin)
+	return hclog.New(&hclog.LoggerOptions{Level: hclog.Error})
 }
 
 func main() {
