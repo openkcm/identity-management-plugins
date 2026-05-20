@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/openkcm/identity-management-plugins/compare/v0.3.1...v0.4.0) (2026-05-20)
+
+
+### Features
+
+* remove slog2hclog package ([#93](https://github.com/openkcm/identity-management-plugins/issues/93)) ([195a24c](https://github.com/openkcm/identity-management-plugins/commit/195a24c7d28d05f1055578bf1550738198eb55c7))
+
 ## [0.3.1](https://github.com/openkcm/identity-management-plugins/compare/v0.3.0...v0.3.1) (2026-05-14)
 
 
