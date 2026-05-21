@@ -6,11 +6,11 @@ toolchain go1.26.3
 
 require (
 	github.com/hashicorp/go-hclog v1.6.3
-	github.com/openkcm/common-sdk v1.15.2
+	github.com/openkcm/common-sdk v1.16.0
 	github.com/openkcm/plugin-sdk v0.11.1
 	github.com/samber/oops v1.21.0
 	github.com/stretchr/testify v1.11.1
-	google.golang.org/grpc v1.80.0
+	google.golang.org/grpc v1.81.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -23,7 +23,7 @@ require (
 	github.com/creasty/defaults v1.8.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.19.0 // indirect
-	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/cel-go v0.28.0 // indirect
