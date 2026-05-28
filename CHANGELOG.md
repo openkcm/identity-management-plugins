@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/openkcm/identity-management-plugins/compare/v0.4.0...v0.4.1) (2026-05-28)
+
+
+### Bug Fixes
+
+* **deps:** bump x/net and x/sys ([#96](https://github.com/openkcm/identity-management-plugins/issues/96)) ([543f6d4](https://github.com/openkcm/identity-management-plugins/commit/543f6d45b38d1d09097afd606077de864076f2f7))
+
 ## [0.4.0](https://github.com/openkcm/identity-management-plugins/compare/v0.3.1...v0.4.0) (2026-05-20)
 
 
