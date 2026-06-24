@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/openkcm/identity-management-plugins/compare/v0.4.2...v0.4.3) (2026-06-24)
+
+
+### Bug Fixes
+
+* **deps:** bump go tool chain version ([#101](https://github.com/openkcm/identity-management-plugins/issues/101)) ([363b4f1](https://github.com/openkcm/identity-management-plugins/commit/363b4f1475b95cc37e54b0847ae543219af9406b))
+
 ## [0.4.2](https://github.com/openkcm/identity-management-plugins/compare/v0.4.1...v0.4.2) (2026-06-24)
 
 
