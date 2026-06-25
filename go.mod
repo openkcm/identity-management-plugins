@@ -6,8 +6,8 @@ toolchain go1.26.4
 
 require (
 	github.com/hashicorp/go-hclog v1.6.3
-	github.com/openkcm/common-sdk v1.16.1
-	github.com/openkcm/plugin-sdk v0.12.0
+	github.com/openkcm/common-sdk v1.17.0
+	github.com/openkcm/plugin-sdk v0.13.0
 	github.com/samber/oops v1.22.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.81.1
