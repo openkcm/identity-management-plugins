@@ -9,6 +9,8 @@ import (
 
 	"github.com/openkcm/common-sdk/pkg/pointers"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	idmangv1 "github.com/openkcm/plugin-sdk/proto/plugin/identity_management/v1"
 
@@ -264,9 +266,13 @@ func TestGetUsersForGroup(t *testing.T) {
 
 func TestGetUser(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte(GetUserResponse))
-		assert.NoError(t, err)
-		w.WriteHeader(http.StatusOK)
+		if strings.Contains(r.URL.Path, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee") {
+			_, err := w.Write([]byte(GetUserResponse))
+			assert.NoError(t, err)
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
 	}))
 	defer server.Close()
 
@@ -287,6 +293,15 @@ func TestGetUser(t *testing.T) {
 			expectedName:  "cloudanalyst",
 			expectedEmail: "cloud.analyst@example.com",
 			expectedError: nil,
+		},
+		{
+			name:          "User not found",
+			serverUrl:     server.URL,
+			userId:        "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeef",
+			expectedID:    "",
+			expectedName:  "",
+			expectedEmail: "",
+			expectedError: status.New(codes.NotFound, "user not found").Err(),
 		},
 	}
 
@@ -310,6 +325,7 @@ func TestGetUser(t *testing.T) {
 			} else {
 				assert.Error(t, err)
 				assert.ErrorIs(t, err, tt.expectedError)
+				assert.Nil(t, resp)
 			}
 		})
 	}
