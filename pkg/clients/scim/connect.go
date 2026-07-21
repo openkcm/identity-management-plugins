@@ -119,7 +119,7 @@ func (c *Client) GetUser(ctx context.Context, id string, params RequestParams) (
 		return nil, errs.Wrap(ErrGetUser, err)
 	}
 
-	// // User not found on SCIM
+	// User not found on SCIM
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, ErrUserDoesNotExist
 	}
