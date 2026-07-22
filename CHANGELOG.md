@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/openkcm/identity-management-plugins/compare/v0.4.3...v0.5.0) (2026-07-22)
+
+
+### Features
+
+* return grpc not found on missing user ([#106](https://github.com/openkcm/identity-management-plugins/issues/106)) ([1375f86](https://github.com/openkcm/identity-management-plugins/commit/1375f86ffd1717cc7b6e315ed9e842883e0a255c))
+
+
+### Bug Fixes
+
+* **deps:** bump go tool chain version ([#107](https://github.com/openkcm/identity-management-plugins/issues/107)) ([832943a](https://github.com/openkcm/identity-management-plugins/commit/832943ad956f503c756feedfd1c2f479f616b94d))
+* **deps:** bump the gomod-group group across 1 directory with 4 updates ([#105](https://github.com/openkcm/identity-management-plugins/issues/105)) ([1f06b8b](https://github.com/openkcm/identity-management-plugins/commit/1f06b8bc8cf160270e660c2178d57de463fefe32))
+
 ## [0.4.3](https://github.com/openkcm/identity-management-plugins/compare/v0.4.2...v0.4.3) (2026-06-24)
 
 
