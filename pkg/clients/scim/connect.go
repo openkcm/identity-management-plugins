@@ -31,6 +31,7 @@ const (
 var (
 	ErrAuthNotImplemented       = errors.New("API Auth not implemented")
 	ErrGetUser                  = errors.New("error getting SCIM user")
+	ErrUserDoesNotExist         = errors.New("user does not exist on scim")
 	ErrListUsers                = errors.New("error listing SCIM users")
 	ErrGetGroup                 = errors.New("error getting SCIM group")
 	ErrListGroups               = errors.New("error listing SCIM groups")
@@ -116,6 +117,11 @@ func (c *Client) GetUser(ctx context.Context, id string, params RequestParams) (
 
 	if err != nil {
 		return nil, errs.Wrap(ErrGetUser, err)
+	}
+
+	// User not found on SCIM
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrUserDoesNotExist
 	}
 
 	user, err := httpclient.DecodeResponse[User](ctx, "SCIM", resp, http.StatusOK)

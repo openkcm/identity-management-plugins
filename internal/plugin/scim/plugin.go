@@ -214,9 +214,14 @@ func (p *Plugin) GetUser(
 		Host:    host,
 		Headers: headers,
 	})
+
+	if errors.Is(err, scim.ErrUserDoesNotExist) {
+		return nil, status.New(codes.NotFound, "user not found").Err()
+	}
+
 	if err != nil {
 		p.logger.Error("GetUser: error listing user", "error", err)
-		return nil, errs.Wrap(ErrGetUser, err)
+		return nil, err
 	}
 
 	return &idmangv1.GetUserResponse{User: &idmangv1.User{

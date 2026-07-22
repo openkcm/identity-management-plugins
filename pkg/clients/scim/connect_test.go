@@ -115,12 +115,15 @@ func getBasicClient() *scim.Client {
 			Basic: commoncfg.BasicAuth{
 				Username: commoncfg.SourceRef{
 					Source: commoncfg.EmbeddedSourceValue,
-					Value:  ""},
+					Value:  "",
+				},
 				Password: commoncfg.SourceRef{
 					Source: commoncfg.EmbeddedSourceValue,
-					Value:  ""},
+					Value:  "",
+				},
 			},
-		}, getLogger())
+		}, getLogger(),
+	)
 
 	return client
 }
@@ -152,10 +155,12 @@ func TestNewClient(t *testing.T) {
 				Basic: commoncfg.BasicAuth{
 					Username: commoncfg.SourceRef{
 						Source: commoncfg.EmbeddedSourceValue,
-						Value:  ""},
+						Value:  "",
+					},
 					Password: commoncfg.SourceRef{
 						Source: commoncfg.EmbeddedSourceValue,
-						Value:  ""},
+						Value:  "",
+					},
 				},
 			},
 			expectError: false,
@@ -168,13 +173,16 @@ func TestNewClient(t *testing.T) {
 				MTLS: commoncfg.MTLS{
 					Cert: commoncfg.SourceRef{
 						Source: commoncfg.EmbeddedSourceValue,
-						Value:  "bad"},
+						Value:  "bad",
+					},
 					CertKey: commoncfg.SourceRef{
 						Source: commoncfg.EmbeddedSourceValue,
-						Value:  "bad"},
+						Value:  "bad",
+					},
 					ServerCA: &commoncfg.SourceRef{
 						Source: commoncfg.EmbeddedSourceValue,
-						Value:  "bad"},
+						Value:  "bad",
+					},
 				},
 			},
 			expectError:   true,
@@ -223,7 +231,7 @@ func TestGetUser(t *testing.T) {
 			responseBody:   `{"detail": "User not found"}`,
 			expectedUser:   nil,
 			expectError:    true,
-			errorContains:  "error getting SCIM user",
+			errorContains:  scim.ErrUserDoesNotExist.Error(),
 		},
 		{
 			name:           "Invalid JSON",
