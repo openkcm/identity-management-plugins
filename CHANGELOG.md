@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/openkcm/identity-management-plugins/compare/v0.5.0...v0.5.1) (2026-08-17)
+
+
+### Bug Fixes
+
+* **deps:** bump github.com/google/cel-go from 0.28.0 to 0.29.0 ([#112](https://github.com/openkcm/identity-management-plugins/issues/112)) ([61538b8](https://github.com/openkcm/identity-management-plugins/commit/61538b8a19b619753d1a9d61601ef5c569e9f8f6))
+* **deps:** bump the gomod-group group across 1 directory with 2 updates ([#111](https://github.com/openkcm/identity-management-plugins/issues/111)) ([17aca76](https://github.com/openkcm/identity-management-plugins/commit/17aca767472ad7486151b1e9bb516c582b113168))
+
 ## [0.5.0](https://github.com/openkcm/identity-management-plugins/compare/v0.4.3...v0.5.0) (2026-07-22)
 
 
