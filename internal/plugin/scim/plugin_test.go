@@ -154,83 +154,69 @@ func TestGetAllGroups(t *testing.T) {
 
 func TestGetUsersForGroup(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		bodyBytes, err := io.ReadAll(r.Body)
-		assert.NoError(t, err)
-
-		// Quick and dirty mock server filtering. Fine since we aren't testing server here
-		reqStr := string(bodyBytes)
-		if strings.Contains(reqStr, NonExistentField) {
-			_, err = w.Write([]byte(EmptyResponse))
-		} else {
-			_, err = w.Write([]byte(ListUsersResponse))
+		// GET /Groups/{id} → return single group with members
+		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/Groups/") {
+			_, err := w.Write([]byte(GetGroupResponse))
+			assert.NoError(t, err)
+			return
 		}
 
-		assert.NoError(t, err)
+		// POST /Users → return users matching member IDs
+		if strings.HasPrefix(r.URL.Path, "/Users") {
+			_, err := w.Write([]byte(ListUsersResponse))
+			assert.NoError(t, err)
+			return
+		}
 
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer server.Close()
 
 	tests := []struct {
-		name                 string
-		serverUrl            string
-		groupFilterAttribute string
-		groupFilterValue     string
-		testNumUsers         int
-		testUserEmail        string
-		testUserName         string
-		testUserID           string
-		testExpectedError    *error
+		name              string
+		serverUrl         string
+		groupFilterValue  string
+		testNumUsers      int
+		testUserEmail     string
+		testUserName      string
+		testUserID        string
+		testExpectedError *error
 	}{
 		{
-			name:                 "Bad Server",
-			serverUrl:            "badurl",
-			groupFilterAttribute: "displayName",
-			groupFilterValue:     "None",
-			testNumUsers:         0,
-			testUserEmail:        "",
-			testUserName:         "",
-			testUserID:           "",
-			testExpectedError:    &scim.ErrListUsers,
+			name:              "Bad Server",
+			serverUrl:         "badurl",
+			groupFilterValue:  "None",
+			testNumUsers:      0,
+			testUserEmail:     "",
+			testUserName:      "",
+			testUserID:        "",
+			testExpectedError: &scim.ErrGetGroup,
 		},
 		{
-			name:                 "Good request",
-			serverUrl:            server.URL,
-			groupFilterAttribute: "displayName",
-			groupFilterValue:     "None",
-			testNumUsers:         1,
-			testUserEmail:        "cloud.analyst@example.com",
-			testUserName:         "cloudanalyst",
-			testUserID:           "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-			testExpectedError:    nil,
+			name:              "Good request",
+			serverUrl:         server.URL,
+			groupFilterValue:  "16e720aa-a009-4949-9bf9-aaaaaaaaaaaa",
+			testNumUsers:      1,
+			testUserEmail:     "cloud.analyst@example.com",
+			testUserName:      "cloudanalyst",
+			testUserID:        "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+			testExpectedError: nil,
 		},
 		{
-			name:                 "Non-existent filter value",
-			serverUrl:            server.URL,
-			groupFilterAttribute: "displayName",
-			groupFilterValue:     "",
-			testNumUsers:         0,
-			testUserEmail:        "",
-			testUserName:         "",
-			testUserID:           "",
-			testExpectedError:    &plugin.ErrNoID,
-		},
-		{
-			name:                 "Non-existent filter attribute",
-			serverUrl:            server.URL,
-			groupFilterAttribute: NonExistentField,
-			groupFilterValue:     "None",
-			testNumUsers:         0,
-			testUserEmail:        "",
-			testUserName:         "",
-			testUserID:           "",
-			testExpectedError:    nil,
+			name:              "Empty group ID",
+			serverUrl:         server.URL,
+			groupFilterValue:  "",
+			testNumUsers:      0,
+			testUserEmail:     "",
+			testUserName:      "",
+			testUserID:        "",
+			testExpectedError: &plugin.ErrNoID,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := setupTest(t, tt.serverUrl, tt.groupFilterAttribute, "")
+			p := setupTest(t, tt.serverUrl, "", "")
 
 			request := idmangv1.GetUsersForGroupRequest{}
 			if tt.groupFilterValue != "" {

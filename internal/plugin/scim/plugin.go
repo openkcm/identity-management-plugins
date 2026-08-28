@@ -273,26 +273,52 @@ func (p *Plugin) GetUsersForGroup(
 		return nil, errs.Wrap(ErrGetUsersForGroup, ErrNoID)
 	}
 
-	var (
-		responseUsers        []*idmangv1.User
-		getUsersForGroupFunc func(context.Context, string, string, map[string]string) ([]*idmangv1.User, error)
-	)
-
-	if p.params.AllowSearchUsersByGroup {
-		getUsersForGroupFunc = p.getUsersForGroupUsingUserList
-	} else {
-		// If SCIM API does not support filtering users by group attribute,
-		// we need to fall back to getting individual users by firstly
-		// getting the user IDs from the group members attribute and
-		// then getting each user by their ID.
-		getUsersForGroupFunc = p.getUsersForGroupUsingGroupMembers
-	}
+	var responseUsers []*idmangv1.User
 
 	host, headers := p.extractAuthContext(request.GetAuthContext().GetData())
 
-	responseUsers, err := getUsersForGroupFunc(ctx, groupID, host, headers)
+	group, err := p.scimClient.GetGroup(
+		ctx, groupID, p.params.GroupMembersAttribute,
+		scim.RequestParams{
+			Host:    host,
+			Headers: headers,
+		},
+	)
 	if err != nil {
 		return nil, errs.Wrap(ErrGetUsersForGroup, err)
+	}
+
+	if len(group.Members) == 0 {
+		return &idmangv1.GetUsersForGroupResponse{Users: responseUsers}, nil
+	}
+
+	memberFilters := make([]scim.FilterExpression, 0, len(group.Members))
+	for _, m := range group.Members {
+		memberFilters = append(memberFilters, scim.FilterComparison{
+			Attribute: "id",
+			Operator:  scim.FilterOperatorEqual,
+			Value:     m.Value,
+		})
+	}
+
+	filter := scim.FilterLogicalGroupOr{Expressions: memberFilters}
+
+	users, err := p.scimClient.ListUsers(ctx, scim.RequestParams{
+		Host:    host,
+		Method:  p.getListMethod(),
+		Filter:  filter,
+		Headers: headers,
+	})
+	if err != nil {
+		return nil, errs.Wrap(ErrGetUsersForGroup, err)
+	}
+
+	for _, user := range users.Resources {
+		responseUsers = append(responseUsers, &idmangv1.User{
+			Id:    user.ID,
+			Name:  user.UserName,
+			Email: getPrimaryEmailAddress(&user),
+		})
 	}
 
 	return &idmangv1.GetUsersForGroupResponse{Users: responseUsers}, nil
@@ -356,80 +382,6 @@ func (p *Plugin) getListMethod() string {
 	}
 
 	return defaultListMethod
-}
-
-func (p *Plugin) getUsersForGroupUsingUserList(
-	ctx context.Context,
-	groupID string,
-	host string,
-	headers map[string]string,
-) ([]*idmangv1.User, error) {
-	responseUsers := make([]*idmangv1.User, 0)
-
-	attr := p.params.GroupAttribute
-	if attr == "" {
-		return nil, errs.Wrap(ErrGetUsersForGroup, errors.New("no group attribute configured"))
-	}
-
-	filter := getFilter(defaultUserListAttribute, groupID, attr)
-
-	users, err := p.scimClient.ListUsers(ctx, scim.RequestParams{
-		Host:    host,
-		Method:  p.getListMethod(),
-		Filter:  filter,
-		Headers: headers,
-	})
-	if err != nil {
-		return nil, errs.Wrap(ErrGetUsersForGroup, err)
-	}
-
-	for _, user := range users.Resources {
-		responseUsers = append(responseUsers, &idmangv1.User{
-			Id:    user.ID,
-			Name:  user.UserName,
-			Email: getPrimaryEmailAddress(&user),
-		})
-	}
-
-	return responseUsers, nil
-}
-
-func (p *Plugin) getUsersForGroupUsingGroupMembers(
-	ctx context.Context,
-	groupID string,
-	host string,
-	headers map[string]string,
-) ([]*idmangv1.User, error) {
-	responseUsers := make([]*idmangv1.User, 0)
-
-	group, err := p.scimClient.GetGroup(
-		ctx, groupID, p.params.GroupMembersAttribute,
-		scim.RequestParams{
-			Host:    host,
-			Headers: headers,
-		},
-	)
-	if err != nil {
-		return nil, errs.Wrap(ErrGetUsersForGroup, err)
-	}
-
-	for _, member := range group.Members {
-		user, err := p.scimClient.GetUser(ctx, member.Value, scim.RequestParams{
-			Host:    host,
-			Headers: headers,
-		})
-		if err != nil {
-			return nil, errs.Wrap(ErrGetUsersForGroup, err)
-		}
-
-		responseUsers = append(responseUsers, &idmangv1.User{
-			Id:    user.ID,
-			Name:  user.UserName,
-			Email: getPrimaryEmailAddress(user),
-		})
-	}
-
-	return responseUsers, nil
 }
 
 func (p *Plugin) extractAuthContext(authContextData map[string]string) (string, map[string]string) {
