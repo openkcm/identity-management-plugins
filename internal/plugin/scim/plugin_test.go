@@ -158,6 +158,7 @@ func TestGetUsersForGroup(t *testing.T) {
 		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/Groups/") {
 			_, err := w.Write([]byte(GetGroupResponse))
 			assert.NoError(t, err)
+
 			return
 		}
 
@@ -165,6 +166,7 @@ func TestGetUsersForGroup(t *testing.T) {
 		if strings.HasPrefix(r.URL.Path, "/Users") {
 			_, err := w.Write([]byte(ListUsersResponse))
 			assert.NoError(t, err)
+
 			return
 		}
 

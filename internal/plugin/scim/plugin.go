@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
@@ -56,13 +55,12 @@ var allFilter = scim.FilterComparison{
 }
 
 type Params struct {
-	BaseHost                string // Fallback host if not provided in auth context
-	GroupAttribute          string
-	UserAttribute           string
-	GroupMembersAttribute   string
-	ListMethod              string
-	AllowSearchUsersByGroup bool
-	AuthContext             config.AuthContextConfig
+	BaseHost              string // Fallback host if not provided in auth context
+	GroupAttribute        string
+	UserAttribute         string
+	GroupMembersAttribute string
+	ListMethod            string
+	AuthContext           config.AuthContextConfig
 }
 
 // Plugin is a simple test implementation of KeystoreProviderServer
@@ -130,16 +128,6 @@ func (p *Plugin) Configure(
 		return nil, ErrID.Wrapf(err, "Failed loading list method")
 	}
 
-	allowSearchUsersByGroupBytes, err := commoncfg.LoadValueFromSourceRef(cfg.Params.AllowSearchUsersByGroup)
-	if err != nil {
-		return nil, ErrID.Wrapf(err, "Failed loading allow search users by group")
-	}
-
-	allowSearchUsersByGroup, err := strconv.ParseBool(string(allowSearchUsersByGroupBytes))
-	if err != nil {
-		return nil, ErrID.Wrapf(err, "Failed parsing allow search users by group")
-	}
-
 	authContextBytes, err := commoncfg.LoadValueFromSourceRef(cfg.AuthContext)
 	if err != nil {
 		return nil, ErrID.Wrapf(err, "Failed loading auth context")
@@ -153,13 +141,12 @@ func (p *Plugin) Configure(
 	}
 
 	p.params = Params{
-		BaseHost:                string(baseHostBytes),
-		GroupAttribute:          string(groupAttrBytes),
-		UserAttribute:           string(userAttrBytes),
-		GroupMembersAttribute:   string(groupMemberAttrBytes),
-		ListMethod:              string(listMethodBytes),
-		AllowSearchUsersByGroup: allowSearchUsersByGroup,
-		AuthContext:             cfgAuthContext,
+		BaseHost:              string(baseHostBytes),
+		GroupAttribute:        string(groupAttrBytes),
+		UserAttribute:         string(userAttrBytes),
+		GroupMembersAttribute: string(groupMemberAttrBytes),
+		ListMethod:            string(listMethodBytes),
+		AuthContext:           cfgAuthContext,
 	}
 
 	client, err := scim.NewClient(cfg.Auth, p.logger)
