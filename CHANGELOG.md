@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/openkcm/identity-management-plugins/compare/v0.5.1...v0.5.2) (2026-08-26)
+
+
+### Bug Fixes
+
+* **deps:** bump github.com/stretchr/testify from 1.11.1 to 1.12.0 in the gomod-group group ([#114](https://github.com/openkcm/identity-management-plugins/issues/114)) ([7626c06](https://github.com/openkcm/identity-management-plugins/commit/7626c06fa317889035d9b7ade547b7efdca6a630))
+
 ## [0.5.1](https://github.com/openkcm/identity-management-plugins/compare/v0.5.0...v0.5.1) (2026-08-17)
 
 
