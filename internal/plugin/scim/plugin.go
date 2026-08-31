@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
@@ -56,13 +55,12 @@ var allFilter = scim.FilterComparison{
 }
 
 type Params struct {
-	BaseHost                string // Fallback host if not provided in auth context
-	GroupAttribute          string
-	UserAttribute           string
-	GroupMembersAttribute   string
-	ListMethod              string
-	AllowSearchUsersByGroup bool
-	AuthContext             config.AuthContextConfig
+	BaseHost              string // Fallback host if not provided in auth context
+	GroupAttribute        string
+	UserAttribute         string
+	GroupMembersAttribute string
+	ListMethod            string
+	AuthContext           config.AuthContextConfig
 }
 
 // Plugin is a simple test implementation of KeystoreProviderServer
@@ -130,16 +128,6 @@ func (p *Plugin) Configure(
 		return nil, ErrID.Wrapf(err, "Failed loading list method")
 	}
 
-	allowSearchUsersByGroupBytes, err := commoncfg.LoadValueFromSourceRef(cfg.Params.AllowSearchUsersByGroup)
-	if err != nil {
-		return nil, ErrID.Wrapf(err, "Failed loading allow search users by group")
-	}
-
-	allowSearchUsersByGroup, err := strconv.ParseBool(string(allowSearchUsersByGroupBytes))
-	if err != nil {
-		return nil, ErrID.Wrapf(err, "Failed parsing allow search users by group")
-	}
-
 	authContextBytes, err := commoncfg.LoadValueFromSourceRef(cfg.AuthContext)
 	if err != nil {
 		return nil, ErrID.Wrapf(err, "Failed loading auth context")
@@ -153,13 +141,12 @@ func (p *Plugin) Configure(
 	}
 
 	p.params = Params{
-		BaseHost:                string(baseHostBytes),
-		GroupAttribute:          string(groupAttrBytes),
-		UserAttribute:           string(userAttrBytes),
-		GroupMembersAttribute:   string(groupMemberAttrBytes),
-		ListMethod:              string(listMethodBytes),
-		AllowSearchUsersByGroup: allowSearchUsersByGroup,
-		AuthContext:             cfgAuthContext,
+		BaseHost:              string(baseHostBytes),
+		GroupAttribute:        string(groupAttrBytes),
+		UserAttribute:         string(userAttrBytes),
+		GroupMembersAttribute: string(groupMemberAttrBytes),
+		ListMethod:            string(listMethodBytes),
+		AuthContext:           cfgAuthContext,
 	}
 
 	client, err := scim.NewClient(cfg.Auth, p.logger)
@@ -273,26 +260,52 @@ func (p *Plugin) GetUsersForGroup(
 		return nil, errs.Wrap(ErrGetUsersForGroup, ErrNoID)
 	}
 
-	var (
-		responseUsers        []*idmangv1.User
-		getUsersForGroupFunc func(context.Context, string, string, map[string]string) ([]*idmangv1.User, error)
-	)
-
-	if p.params.AllowSearchUsersByGroup {
-		getUsersForGroupFunc = p.getUsersForGroupUsingUserList
-	} else {
-		// If SCIM API does not support filtering users by group attribute,
-		// we need to fall back to getting individual users by firstly
-		// getting the user IDs from the group members attribute and
-		// then getting each user by their ID.
-		getUsersForGroupFunc = p.getUsersForGroupUsingGroupMembers
-	}
+	var responseUsers []*idmangv1.User
 
 	host, headers := p.extractAuthContext(request.GetAuthContext().GetData())
 
-	responseUsers, err := getUsersForGroupFunc(ctx, groupID, host, headers)
+	group, err := p.scimClient.GetGroup(
+		ctx, groupID, p.params.GroupMembersAttribute,
+		scim.RequestParams{
+			Host:    host,
+			Headers: headers,
+		},
+	)
 	if err != nil {
 		return nil, errs.Wrap(ErrGetUsersForGroup, err)
+	}
+
+	if len(group.Members) == 0 {
+		return &idmangv1.GetUsersForGroupResponse{Users: responseUsers}, nil
+	}
+
+	memberFilters := make([]scim.FilterExpression, 0, len(group.Members))
+	for _, m := range group.Members {
+		memberFilters = append(memberFilters, scim.FilterComparison{
+			Attribute: "id",
+			Operator:  scim.FilterOperatorEqual,
+			Value:     m.Value,
+		})
+	}
+
+	filter := scim.FilterLogicalGroupOr{Expressions: memberFilters}
+
+	users, err := p.scimClient.ListUsers(ctx, scim.RequestParams{
+		Host:    host,
+		Method:  p.getListMethod(),
+		Filter:  filter,
+		Headers: headers,
+	})
+	if err != nil {
+		return nil, errs.Wrap(ErrGetUsersForGroup, err)
+	}
+
+	for _, user := range users.Resources {
+		responseUsers = append(responseUsers, &idmangv1.User{
+			Id:    user.ID,
+			Name:  user.UserName,
+			Email: getPrimaryEmailAddress(&user),
+		})
 	}
 
 	return &idmangv1.GetUsersForGroupResponse{Users: responseUsers}, nil
@@ -356,80 +369,6 @@ func (p *Plugin) getListMethod() string {
 	}
 
 	return defaultListMethod
-}
-
-func (p *Plugin) getUsersForGroupUsingUserList(
-	ctx context.Context,
-	groupID string,
-	host string,
-	headers map[string]string,
-) ([]*idmangv1.User, error) {
-	responseUsers := make([]*idmangv1.User, 0)
-
-	attr := p.params.GroupAttribute
-	if attr == "" {
-		return nil, errs.Wrap(ErrGetUsersForGroup, errors.New("no group attribute configured"))
-	}
-
-	filter := getFilter(defaultUserListAttribute, groupID, attr)
-
-	users, err := p.scimClient.ListUsers(ctx, scim.RequestParams{
-		Host:    host,
-		Method:  p.getListMethod(),
-		Filter:  filter,
-		Headers: headers,
-	})
-	if err != nil {
-		return nil, errs.Wrap(ErrGetUsersForGroup, err)
-	}
-
-	for _, user := range users.Resources {
-		responseUsers = append(responseUsers, &idmangv1.User{
-			Id:    user.ID,
-			Name:  user.UserName,
-			Email: getPrimaryEmailAddress(&user),
-		})
-	}
-
-	return responseUsers, nil
-}
-
-func (p *Plugin) getUsersForGroupUsingGroupMembers(
-	ctx context.Context,
-	groupID string,
-	host string,
-	headers map[string]string,
-) ([]*idmangv1.User, error) {
-	responseUsers := make([]*idmangv1.User, 0)
-
-	group, err := p.scimClient.GetGroup(
-		ctx, groupID, p.params.GroupMembersAttribute,
-		scim.RequestParams{
-			Host:    host,
-			Headers: headers,
-		},
-	)
-	if err != nil {
-		return nil, errs.Wrap(ErrGetUsersForGroup, err)
-	}
-
-	for _, member := range group.Members {
-		user, err := p.scimClient.GetUser(ctx, member.Value, scim.RequestParams{
-			Host:    host,
-			Headers: headers,
-		})
-		if err != nil {
-			return nil, errs.Wrap(ErrGetUsersForGroup, err)
-		}
-
-		responseUsers = append(responseUsers, &idmangv1.User{
-			Id:    user.ID,
-			Name:  user.UserName,
-			Email: getPrimaryEmailAddress(user),
-		})
-	}
-
-	return responseUsers, nil
 }
 
 func (p *Plugin) extractAuthContext(authContextData map[string]string) (string, map[string]string) {

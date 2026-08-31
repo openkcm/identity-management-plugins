@@ -36,9 +36,8 @@ func (p *Plugin) SetTestClient(t *testing.T, host string, groupFilterAttribute, 
 
 	p.scimClient = client
 	p.params = Params{
-		BaseHost:                host,
-		GroupAttribute:          groupFilterAttribute,
-		UserAttribute:           userFilterAttribute,
-		AllowSearchUsersByGroup: true,
+		BaseHost:       host,
+		GroupAttribute: groupFilterAttribute,
+		UserAttribute:  userFilterAttribute,
 	}
 }
