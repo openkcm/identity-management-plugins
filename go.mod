@@ -1,6 +1,8 @@
 module github.com/openkcm/identity-management-plugins
 
-go 1.26.5
+go 1.27
+
+toolchain go1.27.1
 
 require (
 	github.com/hashicorp/go-hclog v1.6.3
