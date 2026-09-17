@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.3](https://github.com/openkcm/identity-management-plugins/compare/v0.5.2...v0.5.3) (2026-09-17)
+
+
+### Bug Fixes
+
+* **deps:** bump golang.org/x/text to v0.42.0 and golang.org/x/net to v0.59.0 ([#121](https://github.com/openkcm/identity-management-plugins/issues/121)) ([584d18a](https://github.com/openkcm/identity-management-plugins/commit/584d18ac701004b4f7b39437092639d53f2f42e5))
+* **deps:** bump google.golang.org/grpc from 1.83.1 to 1.83.2 in the gomod-group group ([#119](https://github.com/openkcm/identity-management-plugins/issues/119)) ([182a04c](https://github.com/openkcm/identity-management-plugins/commit/182a04ca74927ed804ed5abc4ede94b670bbc7be))
+* **deps:** bump the gomod-group group with 4 updates ([#117](https://github.com/openkcm/identity-management-plugins/issues/117)) ([dcc3339](https://github.com/openkcm/identity-management-plugins/commit/dcc3339add3b3144f0f4539bc5ee27cbc114e579))
+
 ## [0.5.2](https://github.com/openkcm/identity-management-plugins/compare/v0.5.1...v0.5.2) (2026-08-26)
 
 
