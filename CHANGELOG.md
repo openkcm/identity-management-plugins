@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.4](https://github.com/openkcm/identity-management-plugins/compare/v0.5.3...v0.5.4) (2026-09-21)
+
+
+### Bug Fixes
+
+* **deps:** bump the gomod-group group with 2 updates ([#123](https://github.com/openkcm/identity-management-plugins/issues/123)) ([533ad32](https://github.com/openkcm/identity-management-plugins/commit/533ad329da6471a46566e4604e50d7fd53f970a5))
+
 ## [0.5.3](https://github.com/openkcm/identity-management-plugins/compare/v0.5.2...v0.5.3) (2026-09-17)
 
 
