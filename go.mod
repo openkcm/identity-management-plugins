@@ -7,7 +7,7 @@ toolchain go1.27.1
 require (
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/openkcm/common-sdk v1.19.4
-	github.com/openkcm/plugin-sdk v0.15.1
+	github.com/openkcm/plugin-sdk v0.16.0
 	github.com/samber/oops v1.23.2
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/grpc v1.84.0
@@ -49,8 +49,8 @@ require (
 	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260921155816-b14227669459 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260921155816-b14227669459 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260928230214-8a89bd6388cc // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260928230214-8a89bd6388cc // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 )
