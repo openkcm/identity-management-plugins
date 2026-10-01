@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.5](https://github.com/openkcm/identity-management-plugins/compare/v0.5.4...v0.5.5) (2026-10-01)
+
+
+### Bug Fixes
+
+* **deps:** bump deps ([#126](https://github.com/openkcm/identity-management-plugins/issues/126)) ([a6c7472](https://github.com/openkcm/identity-management-plugins/commit/a6c74721badaa09ec67e51a1fc49cf1faf64ef8b))
+
 ## [0.5.4](https://github.com/openkcm/identity-management-plugins/compare/v0.5.3...v0.5.4) (2026-09-21)
 
 
