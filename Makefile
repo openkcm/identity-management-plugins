@@ -22,6 +22,7 @@ clean:
 .PHONY: build
 build: clean
 	go build -o ./bin/scim ./cmd/scim
+	go build -o ./bin/scim-static ./cmd/scim-static
 
 .PHONY: test
 test: clean
