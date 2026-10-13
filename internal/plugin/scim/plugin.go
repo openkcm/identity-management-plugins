@@ -201,13 +201,13 @@ func (p *Plugin) GetUser(
 		Host:    host,
 		Headers: headers,
 	})
-
-	if errors.Is(err, scim.ErrUserDoesNotExist) {
-		return nil, status.New(codes.NotFound, "user not found").Err()
-	}
-
 	if err != nil {
 		p.logger.Error("GetUser: error listing user", "error", err)
+
+		if errors.Is(err, scim.ErrUserDoesNotExist) {
+			return nil, status.New(codes.NotFound, "user not found").Err()
+		}
+
 		return nil, err
 	}
 

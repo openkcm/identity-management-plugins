@@ -35,6 +35,7 @@ func (p *Plugin) SetTestClient(t *testing.T, host string, groupFilterAttribute, 
 	assert.NoError(t, err)
 
 	p.scimClient = client
+	p.logger = getLogger()
 	p.params = Params{
 		BaseHost:       host,
 		GroupAttribute: groupFilterAttribute,
