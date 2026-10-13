@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.0](https://github.com/openkcm/identity-management-plugins/compare/v0.5.5...v0.6.0) (2026-10-13)
+
+
+### Features
+
+* add new plugin scim static allow to serve users and groups from static data. ([#129](https://github.com/openkcm/identity-management-plugins/issues/129)) ([9f504a4](https://github.com/openkcm/identity-management-plugins/commit/9f504a4d6cf893a4c082bbbc81aef70518a8d36e))
+
+
+### Bug Fixes
+
+* include the scim-static as component in Taskfile.yaml ([29e8651](https://github.com/openkcm/identity-management-plugins/commit/29e8651de1fcf5a5984f6fb38fe9af1064095453))
+* returning error before log ([#130](https://github.com/openkcm/identity-management-plugins/issues/130)) ([5c3b7c1](https://github.com/openkcm/identity-management-plugins/commit/5c3b7c17d9113daaab14aace606aad01ae52b24f))
+
 ## [0.5.5](https://github.com/openkcm/identity-management-plugins/compare/v0.5.4...v0.5.5) (2026-10-01)
 
 
