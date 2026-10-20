@@ -1,8 +1,6 @@
 module github.com/openkcm/identity-management-plugins
 
-go 1.27
-
-toolchain go1.27.1
+go 1.27.3
 
 require (
 	github.com/hashicorp/go-hclog v1.6.3
@@ -46,7 +44,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.46.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
-	golang.org/x/net v0.59.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260928230214-8a89bd6388cc // indirect
