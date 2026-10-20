@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/openkcm/identity-management-plugins/compare/v0.6.0...v0.6.1) (2026-10-20)
+
+
+### Bug Fixes
+
+* update the go version ([#132](https://github.com/openkcm/identity-management-plugins/issues/132)) ([6101316](https://github.com/openkcm/identity-management-plugins/commit/6101316ad02fec040eae2bcaff7ecd669725c6d3))
+
 ## [0.6.0](https://github.com/openkcm/identity-management-plugins/compare/v0.5.5...v0.6.0) (2026-10-13)
 
 
