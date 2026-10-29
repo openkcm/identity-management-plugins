@@ -4,7 +4,7 @@ go 1.27.3
 
 require (
 	github.com/hashicorp/go-hclog v1.6.3
-	github.com/openkcm/common-sdk v1.20.0
+	github.com/openkcm/common-sdk v1.21.0
 	github.com/openkcm/plugin-sdk v0.17.0
 	github.com/samber/oops v1.23.2
 	github.com/stretchr/testify v1.12.1
@@ -40,8 +40,8 @@ require (
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spf13/viper v1.21.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	go.opentelemetry.io/otel v1.46.0 // indirect
-	go.opentelemetry.io/otel/trace v1.46.0 // indirect
+	go.opentelemetry.io/otel v1.47.0 // indirect
+	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
 	golang.org/x/net v0.60.0 // indirect
