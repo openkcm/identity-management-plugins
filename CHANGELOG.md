@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.2 (2026-11-17)
+
+## What's Changed
+* fix(deps): bump the gomod-group group across 1 directory with 3 updates by @dependabot[bot] in https://github.com/openkcm/identity-management-plugins/pull/135
+
+
+**Full Changelog**: https://github.com/openkcm/identity-management-plugins/compare/v0.6.1...v0.6.2
+
 ## [0.6.1](https://github.com/openkcm/identity-management-plugins/compare/v0.6.0...v0.6.1) (2026-10-20)
 
 
