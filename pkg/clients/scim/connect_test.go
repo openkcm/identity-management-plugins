@@ -1,13 +1,18 @@
 package scim_test
 
 import (
+	"encoding/base64"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/openkcm/common-sdk/pkg/commoncfg"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/openkcm/identity-management-plugins/pkg/clients/scim"
 )
@@ -118,7 +123,7 @@ func getBasicClient() *scim.Client {
 					Value:  "",
 				},
 			},
-		}, getLogger(),
+		}, nil, getLogger(),
 	)
 
 	return client
@@ -188,7 +193,7 @@ func TestNewClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, err := scim.NewClient(tt.auth, getLogger())
+			client, err := scim.NewClient(tt.auth, nil, getLogger())
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -448,4 +453,140 @@ func TestListGroups(t *testing.T) {
 			}
 		})
 	}
+}
+
+func fastRetryClient(t *testing.T, codes ...int) *scim.Client {
+	t.Helper()
+
+	client, err := scim.NewClient(
+		commoncfg.SecretRef{
+			Type: commoncfg.BasicSecretType,
+			Basic: commoncfg.BasicAuth{
+				Username: commoncfg.SourceRef{Source: commoncfg.EmbeddedSourceValue, Value: ""},
+				Password: commoncfg.SourceRef{Source: commoncfg.EmbeddedSourceValue, Value: ""},
+			},
+		},
+		&commoncfg.HTTPClient{
+			Timeout: time.Second,
+			Retry: commoncfg.HTTPRetry{
+				MaxAttempts:          3,
+				InitialBackoff:       time.Millisecond,
+				MaxBackoff:           5 * time.Millisecond,
+				RetryableStatusCodes: codes,
+			},
+		},
+		getLogger(),
+	)
+	require.NoError(t, err)
+
+	return client
+}
+
+func TestGetUserRetriesOn429(t *testing.T) {
+	var attempts atomic.Int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if attempts.Add(1) == 1 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte(GetUserResponse))
+		assert.NoError(t, err)
+	}))
+	defer server.Close()
+
+	client := fastRetryClient(t, http.StatusTooManyRequests)
+
+	user, err := client.GetUser(t.Context(), "123", scim.RequestParams{Host: server.URL})
+	require.NoError(t, err)
+	assert.Equal(t, &ExpectedUser, user)
+	assert.Equal(t, int32(2), attempts.Load())
+}
+
+func TestGetUserExhaustsRetriesOn429(t *testing.T) {
+	var attempts atomic.Int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts.Add(1)
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+
+	client := fastRetryClient(t, http.StatusTooManyRequests)
+
+	user, err := client.GetUser(t.Context(), "123", scim.RequestParams{Host: server.URL})
+	require.Error(t, err)
+	assert.Nil(t, user)
+	assert.Equal(t, int32(3), attempts.Load())
+}
+
+func TestListUsersPostRetriesReplayBody(t *testing.T) {
+	var (
+		attempts  atomic.Int32
+		firstBody []byte
+	)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		assert.NoError(t, err)
+
+		if attempts.Add(1) == 1 {
+			firstBody = body
+
+			w.WriteHeader(http.StatusTooManyRequests)
+
+			return
+		}
+
+		assert.Equal(t, firstBody, body)
+		w.WriteHeader(http.StatusOK)
+		_, err = w.Write([]byte(ListUsersResponse))
+		assert.NoError(t, err)
+	}))
+	defer server.Close()
+
+	client := fastRetryClient(t, http.StatusTooManyRequests)
+
+	users, err := client.ListUsers(t.Context(), scim.RequestParams{
+		Host:   server.URL,
+		Method: http.MethodPost,
+		Filter: scim.FilterComparison{Attribute: "DisplayName", Operator: scim.FilterOperatorEqual, Value: "None"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, &scim.UserList{Resources: []scim.User{ExpectedUser}}, users)
+	assert.Equal(t, int32(2), attempts.Load())
+}
+
+func TestBasicAuthHeaderUsesRawStdEncoding(t *testing.T) {
+	const id, secret = "client", "secret"
+
+	var got string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Get("Authorization")
+
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte(GetUserResponse))
+		assert.NoError(t, err)
+	}))
+	defer server.Close()
+
+	client, err := scim.NewClient(
+		commoncfg.SecretRef{
+			Type: commoncfg.BasicSecretType,
+			Basic: commoncfg.BasicAuth{
+				Username: commoncfg.SourceRef{Source: commoncfg.EmbeddedSourceValue, Value: id},
+				Password: commoncfg.SourceRef{Source: commoncfg.EmbeddedSourceValue, Value: secret},
+			},
+		}, nil, getLogger(),
+	)
+	require.NoError(t, err)
+
+	_, err = client.GetUser(t.Context(), "123", scim.RequestParams{Host: server.URL})
+	require.NoError(t, err)
+
+	want := "Basic " + base64.RawStdEncoding.EncodeToString([]byte(id+":"+secret))
+	assert.Equal(t, want, got)
 }

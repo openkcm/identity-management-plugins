@@ -149,7 +149,7 @@ func (p *Plugin) Configure(
 		AuthContext:           cfgAuthContext,
 	}
 
-	client, err := scim.NewClient(cfg.Auth, p.logger)
+	client, err := scim.NewClient(cfg.Auth, cfg.HTTPClient, p.logger)
 	if err != nil {
 		return nil, err
 	}

@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/openkcm/common-sdk/pkg/commoncfg"
+	"github.com/openkcm/common-sdk/pkg/commonhttp"
 	"github.com/openkcm/common-sdk/pkg/pointers"
 
 	"github.com/openkcm/identity-management-plugins/pkg/utils/errs"
@@ -60,7 +62,9 @@ type basicAuth struct {
 	clientSecret string
 }
 
-func NewClient(authRef commoncfg.SecretRef, logger hclog.Logger) (*Client, error) {
+func NewClient(authRef commoncfg.SecretRef, httpCfg *commoncfg.HTTPClient, logger hclog.Logger) (*Client, error) {
+	cfg := scimDefaults(httpCfg)
+
 	switch authRef.Type {
 	case commoncfg.BasicSecretType:
 		clientId, err := commoncfg.LoadValueFromSourceRef(authRef.Basic.Username)
@@ -73,31 +77,74 @@ func NewClient(authRef commoncfg.SecretRef, logger hclog.Logger) (*Client, error
 			return nil, ErrClientSecret
 		}
 
+		// cfg.BasicAuth is left unset: doRequest sets Authorization with
+		// RawStdEncoding, which commonhttp's padded SetBasicAuth would not match.
+		httpClient, err := commonhttp.NewHTTPClient(&cfg)
+		if err != nil {
+			return nil, err
+		}
+
 		return &Client{
 			logger:     logger,
-			httpClient: &http.Client{},
+			httpClient: httpClient,
 			basicAuth: &basicAuth{
 				clientID:     string(clientId),
 				clientSecret: string(clientSecret),
 			},
 		}, nil
 	case commoncfg.MTLSSecretType:
-		mtls, err := commoncfg.LoadMTLSConfig(&authRef.MTLS)
+		cfg.MTLS = &authRef.MTLS
+
+		httpClient, err := commonhttp.NewHTTPClient(&cfg)
 		if err != nil {
 			return nil, errs.Wrap(ErrParsingClientCertificate, err)
 		}
 
 		return &Client{
-			logger: logger,
-			httpClient: &http.Client{
-				Transport: &http.Transport{
-					TLSClientConfig: mtls,
-				},
-			},
+			logger:     logger,
+			httpClient: httpClient,
 		}, nil
 	default:
 		return nil, ErrAuthNotImplemented
 	}
+}
+
+// Retry-After is not honoured; backoff is purely exponential. Retry exhaustion
+// surfaces the last error rather than tripping a circuit breaker — that is the
+// intended degradation signal.
+func scimDefaults(in *commoncfg.HTTPClient) commoncfg.HTTPClient {
+	cfg := commoncfg.HTTPClient{}
+	if in != nil {
+		cfg = *in
+	}
+
+	if cfg.Timeout == 0 {
+		cfg.Timeout = 30 * time.Second
+	}
+
+	if cfg.Retry.MaxAttempts == 0 {
+		cfg.Retry.MaxAttempts = 3
+	}
+
+	if cfg.Retry.InitialBackoff == 0 {
+		cfg.Retry.InitialBackoff = 100 * time.Millisecond
+	}
+
+	if cfg.Retry.MaxBackoff == 0 {
+		cfg.Retry.MaxBackoff = time.Second
+	}
+
+	if len(cfg.Retry.RetryableStatusCodes) == 0 {
+		cfg.Retry.RetryableStatusCodes = []int{
+			http.StatusTooManyRequests,
+			http.StatusInternalServerError,
+			http.StatusBadGateway,
+			http.StatusServiceUnavailable,
+			http.StatusGatewayTimeout,
+		}
+	}
+
+	return cfg
 }
 
 // GetUser retrieves a SCIM user by its ID.
