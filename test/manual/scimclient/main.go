@@ -111,7 +111,7 @@ func main() {
 		}
 	}
 
-	client, err := scim.NewClient(secretRef, getLogger())
+	client, err := scim.NewClient(secretRef, nil, getLogger())
 	if err != nil {
 		fmt.Println("Error creating SCIM client:", err.Error())
 		os.Exit(1)

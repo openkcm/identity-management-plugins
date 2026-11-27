@@ -10,10 +10,11 @@ type Params struct {
 }
 
 type Config struct {
-	Host        commoncfg.SourceRef `yaml:"host"`
-	Auth        commoncfg.SecretRef `yaml:"auth"`
-	AuthContext commoncfg.SourceRef `yaml:"authContext"`
-	Params      Params              `yaml:"params"`
+	Host        commoncfg.SourceRef   `yaml:"host"`
+	Auth        commoncfg.SecretRef   `yaml:"auth"`
+	AuthContext commoncfg.SourceRef   `yaml:"authContext"`
+	Params      Params                `yaml:"params"`
+	HTTPClient  *commoncfg.HTTPClient `yaml:"httpClient"`
 }
 
 type AuthContextConfig struct {

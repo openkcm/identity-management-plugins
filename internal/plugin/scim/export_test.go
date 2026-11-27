@@ -31,7 +31,7 @@ func (p *Plugin) SetTestClient(t *testing.T, host string, groupFilterAttribute, 
 		},
 	}
 
-	client, err := scim.NewClient(secretRef, getLogger())
+	client, err := scim.NewClient(secretRef, nil, getLogger())
 	assert.NoError(t, err)
 
 	p.scimClient = client
