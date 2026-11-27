@@ -3,10 +3,12 @@ package scim
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
@@ -437,12 +439,17 @@ func (p *Plugin) extractAuthContext(authContextData map[string]string) (string, 
 	host := authContextData[hostField]
 
 	if host != "" {
-		joinedURL, err := url.JoinPath(host, p.params.AuthContext.BasePath)
-		if err != nil {
-			p.logger.Warn("Failed to join host and base path, using host as is",
-				"error", err, "host", host, "basePath", p.params.AuthContext.BasePath)
+		if err := validateSCIMHost(host, p.params.AuthContext.HostSuffixes); err != nil {
+			p.logger.Warn("Rejecting auth context host, falling back to base host", "error", err)
+			host = p.params.BaseHost
 		} else {
-			host = joinedURL
+			joinedURL, err := url.JoinPath(host, p.params.AuthContext.BasePath)
+			if err != nil {
+				p.logger.Warn("Failed to join host and base path, using host as is",
+					"error", err, "host", host, "basePath", p.params.AuthContext.BasePath)
+			} else {
+				host = joinedURL
+			}
 		}
 	} else {
 		host = p.params.BaseHost
@@ -457,6 +464,28 @@ func (p *Plugin) extractAuthContext(authContextData map[string]string) (string, 
 	}
 
 	return host, headers
+}
+
+// validateSCIMHost ensures the host from auth context is an https URL whose
+// hostname matches one of the configured allowedHostSuffixes.
+func validateSCIMHost(host string, allowedHostSuffixes []string) error {
+	u, err := url.ParseRequestURI(host)
+	if err != nil {
+		return fmt.Errorf("invalid SCIM host URL %q: %w", host, err)
+	}
+	if u.Scheme != "https" {
+		return fmt.Errorf("SCIM host %q must use https scheme", host)
+	}
+	if len(allowedHostSuffixes) == 0 {
+		return fmt.Errorf("no allowed SCIM host suffixes configured")
+	}
+	hostname := u.Hostname()
+	for _, suffix := range allowedHostSuffixes {
+		if strings.HasSuffix(hostname, suffix) {
+			return nil
+		}
+	}
+	return fmt.Errorf("SCIM host %q does not match any allowed suffix", host)
 }
 
 func getFilter(defaultAttribute, value string, setAttribute string) scim.FilterExpression {

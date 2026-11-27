@@ -441,3 +441,38 @@ func TestNewPlugin(t *testing.T) {
 	p := setupTest(t, "", "", "")
 	assert.NotNil(t, p)
 }
+
+func TestValidateSCIMHost(t *testing.T) {
+	suffixes := []string{"idp.example.com", "idp2.example.com"}
+
+	tests := []struct {
+		name    string
+		host    string
+		wantErr bool
+	}{
+		{"valid primary suffix", "https://tenant.idp.example.com", false},
+		{"valid secondary suffix", "https://other-tenant.idp2.example.com", false},
+		{"http scheme rejected", "http://tenant.idp.example.com", true},
+		{"no scheme rejected", "tenant.idp.example.com", true},
+		{"unknown domain rejected", "https://attacker.example.com", true},
+		{"internal IP rejected", "https://10.0.0.1", true},
+		{"localhost rejected", "https://localhost", true},
+		{"empty suffixes list", "https://tenant.idp.example.com", true},
+		{"suffix squatting rejected", "https://idp.example.com.evil.com", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := suffixes
+			if tt.name == "empty suffixes list" { //nolint:goconst
+				s = nil
+			}
+			err := plugin.ValidateSCIMHost(tt.host, s)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

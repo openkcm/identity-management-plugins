@@ -19,6 +19,7 @@ type Config struct {
 
 type AuthContextConfig struct {
 	HostField    string            `yaml:"hostField"`
+	HostSuffixes []string          `yaml:"hostSuffixes"`
 	HeaderFields map[string]string `yaml:"headerFields"`
 	BasePath     string            `yaml:"basePath"`
 }

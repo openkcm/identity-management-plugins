@@ -10,6 +10,9 @@ import (
 	"github.com/openkcm/identity-management-plugins/pkg/clients/scim"
 )
 
+// ValidateSCIMHost exports the unexported validateSCIMHost for testing.
+var ValidateSCIMHost = validateSCIMHost
+
 func getLogger() hclog.Logger {
 	return hclog.New(&hclog.LoggerOptions{Level: hclog.Error})
 }
